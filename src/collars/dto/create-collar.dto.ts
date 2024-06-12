@@ -1,1 +1,3 @@
-export class CreateCollarDto {}
+export class CreateCollarDto {
+    
+}
