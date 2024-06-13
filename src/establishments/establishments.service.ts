@@ -13,8 +13,8 @@ export class EstablishmentsService {
   
   constructor(
     @InjectRepository(EstablishmentEntity)
-    @InjectRepository(CollarEntity)
     private establishmentRepository: Repository<EstablishmentEntity>,
+    @InjectRepository(CollarEntity)
     private collarRepository: Repository<CollarEntity>
   ) {}
 
