@@ -12,7 +12,7 @@ export class CollarEntity extends TimestampedEntity {
     @Column()
     name: string;
 
-    @ManyToOne(() => EstablishmentEntity, (establishment) => establishment.collars)
+    @ManyToOne(() => EstablishmentEntity, (establishment) => establishment.collars, {nullable: false})
     establishment: EstablishmentEntity
 
 }
