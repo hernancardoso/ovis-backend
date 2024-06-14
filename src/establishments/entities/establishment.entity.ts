@@ -1,5 +1,5 @@
-/* user.entity.ts */
 /* eslint-disable prettier/prettier */
+/* user.entity.ts */
 import { CollarEntity } from "src/collars/entities/collar.entity";
 import { Column, Entity, PrimaryGeneratedColumn, OneToMany } from "typeorm";
 
