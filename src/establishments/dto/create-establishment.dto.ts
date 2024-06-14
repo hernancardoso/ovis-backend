@@ -1,4 +1,4 @@
 export class CreateEstablishmentDto {
-    name: string
-    collarIds?: string[]
+  name: string;
+  collarIds?: string[];
 }

@@ -1,4 +1,4 @@
 export class CreateCollarDto {
-    name: string;
-    establishmentId: string
+  name: string;
+  establishmentId: string;
 }

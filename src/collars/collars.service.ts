@@ -6,35 +6,39 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { EstablishmentsService } from 'src/establishments/establishments.service';
 
-
 @Injectable()
 export class CollarsService {
   constructor(
     @InjectRepository(CollarEntity)
     private collarRepository: Repository<CollarEntity>,
     @Inject(forwardRef(() => EstablishmentsService))
-    private establishmentService: EstablishmentsService
-  ) { }
-
+    private establishmentService: EstablishmentsService,
+  ) {}
 
   async create(createCollarDto: CreateCollarDto) {
-    const collar = this.collarRepository.create(createCollarDto)
+    const collar = this.collarRepository.create(createCollarDto);
 
-    const establishment = await this.establishmentService.findById(createCollarDto.establishmentId)
-    collar.establishment = establishment
+    const establishment = await this.establishmentService.findById(
+      createCollarDto.establishmentId,
+    );
+    collar.establishment = establishment;
 
-    return this.collarRepository.save(collar)
-
+    return this.collarRepository.save(collar);
   }
 
   async update(id: string, updateCollarDto: UpdateCollarDto) {
-    const collar = await this.findByIdOrFail(id)
-    collar.name = updateCollarDto.name ?? collar.name
+    const collar = await this.findByIdOrFail(id);
+    collar.name = updateCollarDto.name ?? collar.name;
 
-    if (updateCollarDto.establishmentId && collar.establishment.id !== updateCollarDto.establishmentId)
-      collar.establishment = await this.establishmentService.findById(updateCollarDto.establishmentId)
+    if (
+      updateCollarDto.establishmentId &&
+      collar.establishment.id !== updateCollarDto.establishmentId
+    )
+      collar.establishment = await this.establishmentService.findById(
+        updateCollarDto.establishmentId,
+      );
 
-    return this.collarRepository.save(collar)
+    return this.collarRepository.save(collar);
   }
 
   findAll() {
@@ -45,23 +49,21 @@ export class CollarsService {
     return `This action returns a #${id} collar`;
   }
 
-
-
   remove(id: number) {
     return `This action removes a #${id} collar`;
   }
 
   findById(id: string) {
-    if (!id) throw new Error("La id del collar no puede ser vacía")
-    return this.collarRepository.findOneByOrFail({ id: id ?? "" })
+    if (!id) throw new Error('La id del collar no puede ser vacía');
+    return this.collarRepository.findOneByOrFail({ id: id ?? '' });
   }
 
   findByIdOrFail(id: string) {
-    if (!id) throw new Error("La id del collar no puede ser vacía")
-    return this.collarRepository.findOneByOrFail({ id: id ?? "" })
+    if (!id) throw new Error('La id del collar no puede ser vacía');
+    return this.collarRepository.findOneByOrFail({ id: id ?? '' });
   }
 
   findByIds(ids: string[]): Promise<CollarEntity[]> {
-    return this.collarRepository.findBy({ id: In(ids) })
+    return this.collarRepository.findBy({ id: In(ids) });
   }
 }

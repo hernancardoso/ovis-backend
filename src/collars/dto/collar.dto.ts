@@ -1,6 +1,6 @@
-import { EstablishmentDTO } from "src/establishments/dto/establishment.dto";
+import { EstablishmentDTO } from 'src/establishments/dto/establishment.dto';
 
 export class CollarDTO {
-    id: string;
-    establishment: EstablishmentDTO
+  id: string;
+  establishment: EstablishmentDTO;
 }
