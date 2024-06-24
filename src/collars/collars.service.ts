@@ -11,15 +11,16 @@ export class CollarsService {
   constructor(
     @InjectRepository(CollarEntity)
     private collarRepository: Repository<CollarEntity>,
+
     @Inject(forwardRef(() => EstablishmentsService))
-    private establishmentService: EstablishmentsService,
+    private establishmentService: EstablishmentsService
   ) {}
 
   async create(createCollarDto: CreateCollarDto) {
     const collar = this.collarRepository.create(createCollarDto);
 
     const establishment = await this.establishmentService.findById(
-      createCollarDto.establishmentId,
+      createCollarDto.establishmentId
     );
     collar.establishment = establishment;
 
@@ -35,7 +36,7 @@ export class CollarsService {
       collar.establishment.id !== updateCollarDto.establishmentId
     )
       collar.establishment = await this.establishmentService.findById(
-        updateCollarDto.establishmentId,
+        updateCollarDto.establishmentId
       );
 
     return this.collarRepository.save(collar);

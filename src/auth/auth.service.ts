@@ -1,5 +1,6 @@
-import { AuthConfig } from './auth.config';
-import { Inject, Injectable } from '@nestjs/common';
+import { IAuthConfig } from '../config/auth.config';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   AuthenticationDetails,
   CognitoUser,
@@ -9,10 +10,12 @@ import {
 @Injectable()
 export class AuthService {
   private userPool: CognitoUserPool;
-  constructor(private readonly authConfig: AuthConfig) {
+
+  constructor(private readonly configService: ConfigService) {
+    const authConfig = this.configService.get<IAuthConfig>('auth');
     this.userPool = new CognitoUserPool({
-      UserPoolId: this.authConfig.userPoolId,
-      ClientId: this.authConfig.clientId,
+      UserPoolId: authConfig.userPoolId,
+      ClientId: authConfig.clientId,
     });
   }
 
