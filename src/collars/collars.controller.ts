@@ -27,7 +27,7 @@ export class CollarsController {
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.collarsService.findOne(+id);
+    return this.collarsService.findOne(id);
   }
 
   @Patch(':id')

@@ -46,8 +46,15 @@ export class CollarsService {
     return `This action returns all collars`;
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} collar`;
+  async findOne(id: string) {
+    return this.collarRepository.findOne({
+      where: { id },
+      // loadRelationIds: {
+      //   relations: ['establishment'],
+      //   disableMixedMap: true,
+      // },
+      relations: ['establishment'],
+    });
   }
 
   remove(id: number) {

@@ -6,6 +6,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { CollarEntity } from 'src/collars/entities/collar.entity';
 import { CollarsService } from 'src/collars/collars.service';
+import { EstablishmentWithCollarsDto } from './dto/establishment.dto';
+import { GetCollarsResponse } from './dto/get-collar-response.dto';
+import { CollarDto } from 'src/collars/dto/collar.dto';
 
 @Injectable()
 export class EstablishmentsService {
@@ -15,19 +18,19 @@ export class EstablishmentsService {
     @InjectRepository(EstablishmentEntity)
     private establishmentRepository: Repository<EstablishmentEntity>,
     @Inject(forwardRef(() => CollarsService))
-    private collarService: CollarsService,
+    private collarService: CollarsService
   ) {}
 
   async create(
-    createEstablishmentDto: CreateEstablishmentDto,
+    createEstablishmentDto: CreateEstablishmentDto
   ): Promise<EstablishmentEntity> {
     const establishment = this.establishmentRepository.create(
-      createEstablishmentDto,
+      createEstablishmentDto
     );
 
-    if (createEstablishmentDto?.collarIds.length) {
+    if (createEstablishmentDto?.collarIds?.length) {
       const collars = await this.collarService.findByIds(
-        createEstablishmentDto.collarIds,
+        createEstablishmentDto.collarIds
       );
 
       if (collars.length !== createEstablishmentDto.collarIds.length)
@@ -45,7 +48,7 @@ export class EstablishmentsService {
 
     if (updateEstablishmentDto.collarIds?.length) {
       const newCollars = await this.collarService.findByIds(
-        updateEstablishmentDto.collarIds,
+        updateEstablishmentDto.collarIds
       );
       if (newCollars.length !== updateEstablishmentDto.collarIds.length)
         throw new Error('One or more collar IDs are invalid');
@@ -67,6 +70,16 @@ export class EstablishmentsService {
 
   async findOne(id: string) {
     return `This action returns a #establishments`;
+  }
+
+  async getCollars(id: string): Promise<CollarDto[]> {
+    const establishment = await this.establishmentRepository.find({
+      where: { id },
+      relations: ['collars'],
+    });
+    establishment.map<CollarDto>((collar) => ({
+id: collar.
+    }));
   }
 
   remove(id: number) {

@@ -1,6 +1,12 @@
 import { TimestampedEntity } from 'src/commons/entities/timestamped.entity';
 import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
-import { Column, Entity, PrimaryGeneratedColumn, ManyToOne } from 'typeorm';
+import {
+  Column,
+  Entity,
+  PrimaryGeneratedColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 
 @Entity({ name: 'collars' })
 export class CollarEntity extends TimestampedEntity {

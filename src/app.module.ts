@@ -18,11 +18,10 @@ import { TypeOrmConfigService } from './datasource/typeorm-config.service';
     ConfigModule.forRoot({
       isGlobal: true,
       load: [databaseConfig, authConfig],
+      envFilePath: ['.env.development.local'],
     }),
     CollarsModule,
-    TypeOrmModule.forRootAsync({
-      useClass: TypeOrmConfigService,
-    }),
+    TypeOrmModule.forRootAsync({ useClass: TypeOrmConfigService }),
     EstablishmentsModule,
     SheepModule,
     AuthModule,

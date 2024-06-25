@@ -30,10 +30,15 @@ export class EstablishmentsController {
     return this.establishmentsService.findOne(id);
   }
 
+  @Get(':id/collars')
+  getCollars(@Param('id') id: string) {
+    return this.establishmentsService.getCollars(id);
+  }
+
   @Patch(':id')
   update(
     @Param('id') id: string,
-    @Body() updateEstablishmentDto: UpdateEstablishmentDto,
+    @Body() updateEstablishmentDto: UpdateEstablishmentDto
   ) {
     return this.establishmentsService.update(id, updateEstablishmentDto);
   }
