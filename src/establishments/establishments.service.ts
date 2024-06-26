@@ -7,13 +7,11 @@ import { Repository, In } from 'typeorm';
 import { CollarEntity } from 'src/collars/entities/collar.entity';
 import { CollarsService } from 'src/collars/collars.service';
 import { EstablishmentWithCollarsDto } from './dto/establishment.dto';
-import { GetCollarsResponse } from './dto/get-collar-response.dto';
+import { GetCollarsResponse } from './dto/responses/get-collars-response.dto';
 import { CollarDto } from 'src/collars/dto/collar.dto';
 
 @Injectable()
 export class EstablishmentsService {
-  private logger = new Logger();
-
   constructor(
     @InjectRepository(EstablishmentEntity)
     private establishmentRepository: Repository<EstablishmentEntity>,
@@ -72,14 +70,13 @@ export class EstablishmentsService {
     return `This action returns a #establishments`;
   }
 
-  async getCollars(id: string): Promise<CollarDto[]> {
-    const establishment = await this.establishmentRepository.find({
+  async getCollars(id: string) {
+    const establishment = await this.establishmentRepository.findOne({
       where: { id },
       relations: ['collars'],
     });
-    establishment.map<CollarDto>((collar) => ({
-id: collar.
-    }));
+
+    return establishment.collars.map((collar) => collar);
   }
 
   remove(id: number) {

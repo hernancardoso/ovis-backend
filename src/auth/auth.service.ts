@@ -1,4 +1,3 @@
-import { IAuthConfig } from '../config/auth.config';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -6,16 +5,24 @@ import {
   CognitoUser,
   CognitoUserPool,
 } from 'amazon-cognito-identity-js';
+import {
+  IAuthConfig,
+  IConfigService,
+} from 'src/config/interfaces/config.interface';
 
 @Injectable()
 export class AuthService {
   private userPool: CognitoUserPool;
 
-  constructor(private readonly configService: ConfigService) {
-    const authConfig = this.configService.get<IAuthConfig>('auth');
+  constructor(
+    private readonly configService: ConfigService<IConfigService, true>
+  ) {
+    const { userPoolId, clientId } =
+      this.configService.get<IAuthConfig>('auth');
+
     this.userPool = new CognitoUserPool({
-      UserPoolId: authConfig.userPoolId,
-      ClientId: authConfig.clientId,
+      UserPoolId: userPoolId,
+      ClientId: clientId,
     });
   }
 
