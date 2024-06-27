@@ -5,6 +5,7 @@ import { CollarEntity } from './entities/collar.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { EstablishmentsService } from 'src/establishments/establishments.service';
+import { FindFailAction } from 'src/commons/enums/find-fail-action.enum';
 
 @Injectable()
 export class CollarsService {
@@ -33,7 +34,7 @@ export class CollarsService {
 
     if (
       updateCollarDto.establishmentId &&
-      collar.establishmentId !== updateCollarDto.establishmentId
+      collar.establishment?.id !== updateCollarDto.establishmentId
     )
       collar.establishment = await this.establishmentService.findById(
         updateCollarDto.establishmentId

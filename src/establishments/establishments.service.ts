@@ -4,12 +4,9 @@ import { UpdateEstablishmentDto } from './dto/update-establishment.dto';
 import { EstablishmentEntity } from './entities/establishment.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
-import { CollarEntity } from 'src/collars/entities/collar.entity';
+
 import { CollarsService } from 'src/collars/collars.service';
-import { EstablishmentWithCollarsDto } from './dto/establishment.dto';
-import { GetCollarsResponse } from './dto/responses/get-collars-response.dto';
-import { CollarDto } from 'src/collars/dto/collar.dto';
-import { z } from 'zod';
+
 import { Collar } from 'src/collars/models/collar.model';
 
 @Injectable()
@@ -44,7 +41,7 @@ export class EstablishmentsService {
 
   async update(id: string, updateEstablishmentDto: UpdateEstablishmentDto) {
     const establishment = await this.findById(id);
-    establishment.name = updateEstablishmentDto.name ?? establishment.name;
+    establishment.name = updateEstablishmentDto.name ?? establishment.name; //if updateEstablishmentDto.name is empty use the last name saved
 
     if (updateEstablishmentDto.collarIds?.length) {
       const newCollars = await this.collarService.findByIds(
@@ -59,8 +56,8 @@ export class EstablishmentsService {
     return this.establishmentRepository.save(establishment);
   }
 
-  findAll() {
-    return `This action returns all establishments`;
+  async findAll() {
+    return this.establishmentRepository.find();
   }
 
   async findById(id: string) {
@@ -78,10 +75,7 @@ export class EstablishmentsService {
       relations: ['collars'],
     });
 
-    return establishment.collars.map((collar) =>
-      new Collar(collar).toDto({ omit: ['establishment'] })
-    );
-    // return establishment.collars.map((collar) => collar);
+    return establishment.collars;
   }
 
   remove(id: number) {

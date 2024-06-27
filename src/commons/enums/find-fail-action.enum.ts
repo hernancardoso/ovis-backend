@@ -1,0 +1,4 @@
+export enum FindFailAction {
+  THROW_ERROR = 'THROW_ERROR',
+  RETURN_EMPTY_ARRAY = 'RETURN_EMPTY_ARRAY',
+}
