@@ -21,5 +21,12 @@ export class CollarEntity extends TimestampedEntity {
     (establishment) => establishment.collars,
     { nullable: false }
   )
-  establishment: EstablishmentEntity;
+  establishment: EstablishmentEntity | undefined;
+
+  @Column({ nullable: false })
+  establishmentId: EstablishmentEntity['id'];
+}
+
+interface CollarEntityWith extends CollarEntity {
+  establishment: NonNullable<CollarEntity['establishment']>;
 }

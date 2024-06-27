@@ -10,6 +10,7 @@ import {
 import { CollarsService } from './collars.service';
 import { CreateCollarDto } from './dto/create-collar.dto';
 import { UpdateCollarDto } from './dto/update-collar.dto';
+import { z } from 'zod';
 
 @Controller('collars')
 export class CollarsController {

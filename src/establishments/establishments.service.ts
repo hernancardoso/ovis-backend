@@ -9,6 +9,8 @@ import { CollarsService } from 'src/collars/collars.service';
 import { EstablishmentWithCollarsDto } from './dto/establishment.dto';
 import { GetCollarsResponse } from './dto/responses/get-collars-response.dto';
 import { CollarDto } from 'src/collars/dto/collar.dto';
+import { z } from 'zod';
+import { Collar } from 'src/collars/models/collar.model';
 
 @Injectable()
 export class EstablishmentsService {
@@ -71,12 +73,15 @@ export class EstablishmentsService {
   }
 
   async getCollars(id: string) {
-    const establishment = await this.establishmentRepository.findOne({
+    const establishment = await this.establishmentRepository.findOneOrFail({
       where: { id },
       relations: ['collars'],
     });
 
-    return establishment.collars.map((collar) => collar);
+    return establishment.collars.map((collar) =>
+      new Collar(collar).toDto({ omit: ['establishment'] })
+    );
+    // return establishment.collars.map((collar) => collar);
   }
 
   remove(id: number) {

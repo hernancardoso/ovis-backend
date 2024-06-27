@@ -33,7 +33,7 @@ export class CollarsService {
 
     if (
       updateCollarDto.establishmentId &&
-      collar.establishment.id !== updateCollarDto.establishmentId
+      collar.establishmentId !== updateCollarDto.establishmentId
     )
       collar.establishment = await this.establishmentService.findById(
         updateCollarDto.establishmentId
