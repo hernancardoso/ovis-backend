@@ -12,6 +12,7 @@ import databaseConfig from './config/typeorm.config';
 import authConfig from './config/auth.config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TypeOrmConfigService } from './datasource/typeorm-config.service';
+import { SheepCollarModule } from './sheep-collar/sheep-collar.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { TypeOrmConfigService } from './datasource/typeorm-config.service';
     EstablishmentsModule,
     SheepModule,
     AuthModule,
+    SheepCollarModule,
   ],
   controllers: [AppController],
   providers: [AppService],
