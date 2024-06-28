@@ -2,10 +2,16 @@ import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/commo
 import { SheepCollarService } from './sheep-collar.service';
 import { CreateSheepCollarDto } from './dto/create-sheep-collar.dto';
 import { UpdateSheepCollarDto } from './dto/update-sheep-collar.dto';
+import { AssignCollarToSheepDto } from './dto/assign-collar-to-sheep.dto';
 
 @Controller('sheep-collar')
 export class SheepCollarController {
   constructor(private readonly sheepCollarService: SheepCollarService) {}
+
+  @Post('/assign')
+  assign(@Body() assignCollarToSheepDto: AssignCollarToSheepDto) {
+    return this.sheepCollarService.assign(assignCollarToSheepDto);
+  }
 
   @Post()
   create(@Body() createSheepCollarDto: CreateSheepCollarDto) {

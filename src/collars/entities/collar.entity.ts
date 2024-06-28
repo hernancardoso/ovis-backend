@@ -1,14 +1,7 @@
 import { TimestampedEntity } from 'src/commons/entities/timestamped.entity';
 import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
 import { SheepCollarEntity } from 'src/sheep-collar/entities/sheep-collar.entity';
-import {
-  Column,
-  Entity,
-  PrimaryGeneratedColumn,
-  ManyToOne,
-  JoinColumn,
-  OneToMany,
-} from 'typeorm';
+import { Column, Entity, PrimaryGeneratedColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 
 @Entity({ name: 'collars' })
 export class CollarEntity extends TimestampedEntity {
@@ -18,11 +11,7 @@ export class CollarEntity extends TimestampedEntity {
   @Column()
   name: string;
 
-  @ManyToOne(
-    () => EstablishmentEntity,
-    (establishment) => establishment.collars,
-    { nullable: false }
-  )
+  @ManyToOne(() => EstablishmentEntity, (establishment) => establishment.collars, { nullable: false })
   @JoinColumn({ name: 'establishmentId' })
   establishment: EstablishmentEntity | undefined;
 

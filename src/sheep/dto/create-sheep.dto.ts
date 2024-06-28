@@ -1,1 +1,3 @@
-export class CreateSheepDto {}
+export class CreateSheepDto {
+  name: string;
+}

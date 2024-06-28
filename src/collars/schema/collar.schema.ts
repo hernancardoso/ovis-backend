@@ -6,7 +6,6 @@ import { establishmentSchema } from 'src/establishments/schemas/establishment.sc
 export const collarBaseSchema = z.object({
   id: z.string().uuid(),
   name: z.string().max(255),
-  establishment: establishmentSchema.omit({ collars: true }).optional(), // Avoid circular reference
   establishmentId: z.string().uuid().optional(),
 });
 

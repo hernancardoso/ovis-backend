@@ -5,7 +5,6 @@ import { CollarEntity } from './entities/collar.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { EstablishmentsService } from 'src/establishments/establishments.service';
-import { FindFailAction } from 'src/commons/enums/find-fail-action.enum';
 
 @Injectable()
 export class CollarsService {
@@ -20,9 +19,7 @@ export class CollarsService {
   async create(createCollarDto: CreateCollarDto) {
     const collar = this.collarRepository.create(createCollarDto);
 
-    const establishment = await this.establishmentService.findById(
-      createCollarDto.establishmentId
-    );
+    const establishment = await this.establishmentService.findById(createCollarDto.establishmentId);
     collar.establishment = establishment;
 
     return this.collarRepository.save(collar);
@@ -32,13 +29,8 @@ export class CollarsService {
     const collar = await this.findByIdOrFail(id);
     collar.name = updateCollarDto.name ?? collar.name;
 
-    if (
-      updateCollarDto.establishmentId &&
-      collar.establishment?.id !== updateCollarDto.establishmentId
-    )
-      collar.establishment = await this.establishmentService.findById(
-        updateCollarDto.establishmentId
-      );
+    if (updateCollarDto.establishmentId && collar.establishment?.id !== updateCollarDto.establishmentId)
+      collar.establishment = await this.establishmentService.findById(updateCollarDto.establishmentId);
 
     return this.collarRepository.save(collar);
   }
