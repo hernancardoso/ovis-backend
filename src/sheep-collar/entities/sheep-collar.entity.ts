@@ -10,14 +10,14 @@ export class SheepCollarEntity {
   @Column({ nullable: false })
   sheepId: SheepEntity['id'];
 
-  @ManyToOne(() => SheepEntity, (sheep) => sheep.collars, { nullable: false })
+  @ManyToOne(() => SheepEntity, (sheep) => sheep.collars)
   @JoinColumn({ name: 'sheepId' })
   sheep: SheepEntity;
 
   @Column({ nullable: false })
   collarId: CollarEntity['id'];
 
-  @ManyToOne(() => CollarEntity, (collar) => collar.sheep, { nullable: false })
+  @ManyToOne(() => CollarEntity, (collar) => collar.sheep)
   @JoinColumn({ name: 'collarId' })
   collar: CollarEntity;
 

@@ -8,6 +8,7 @@ import { Repository, Not, IsNull } from 'typeorm';
 import { CollarDto } from 'src/collars/dto/collar.dto';
 import { AssignCollarToSheepDto } from './dto/assign-collar-to-sheep.dto';
 import { SheepEntity } from 'src/sheep/entities/sheep.entity';
+import { CollarEntity } from 'src/collars/entities/collar.entity';
 
 @Injectable()
 export class SheepCollarService {
@@ -23,12 +24,17 @@ export class SheepCollarService {
     });
   }
 
-  private async findAssignedCollar(collarId: SheepEntity['id']) {
-    return await this.sheepCollarRepository.find()[0];
-    // return await this.sheepCollarRepository.findOne({
-    //   where: { collar: { id: collarId }, assignedUntil: IsNull() },
-    //   order: { id: 'DESC' },
-    // });
+  private async findAssignedCollar(collarId: CollarEntity['id']): Promise<Omit<SheepCollarEntity, 'collar'> | null> {
+    const sheepCollar = await this.sheepCollarRepository.findOne({
+      where: { collar: { id: collarId }, assignedUntil: IsNull() },
+      order: { id: 'DESC' },
+    });
+
+    if (!sheepCollar) {
+      return null;
+    }
+
+    return sheepCollar as Omit<SheepCollarEntity, 'collar'>;
   }
 
   async assign(assignCollarToSheepDto: AssignCollarToSheepDto) {
@@ -36,7 +42,7 @@ export class SheepCollarService {
     const { collarId, sheepId, assignedFrom } = assignCollarToSheepDto;
 
     // Check that the collar or the sheep is not in use
-    const collar = (await this.findAssignedCollar(collarId))?.collar;
+    const collar = await this.findAssignedCollar(collarId);
     console.log(collar);
     const sheep = (await this.findAssignedSheep(sheepId))?.sheep;
 
