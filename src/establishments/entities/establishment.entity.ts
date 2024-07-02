@@ -2,6 +2,7 @@
 /* user.entity.ts */
 import { CollarEntity } from 'src/collars/entities/collar.entity';
 import { TimestampedEntity } from 'src/commons/entities/timestamped.entity';
+import { PaddockEntity } from 'src/paddocks/entities/paddock.entity';
 import { SheepEntity } from 'src/sheep/entities/sheep.entity';
 import { Column, Entity, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
 
@@ -16,6 +17,6 @@ export class EstablishmentEntity extends TimestampedEntity {
   @OneToMany(() => CollarEntity, (collar) => collar.establishment)
   collars: CollarEntity[];
 
-  @OneToMany(() => SheepEntity, (sheep) => sheep.establishment)
-  sheeps: SheepEntity[];
+  @OneToMany(() => PaddockEntity, (paddock) => paddock.establishment)
+  paddocks: PaddockEntity[];
 }

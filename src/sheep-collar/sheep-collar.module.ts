@@ -5,9 +5,10 @@ import { SheepCollarEntity } from './entities/sheep-collar.entity';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CollarsModule } from 'src/collars/collars.module';
 import { SheepModule } from 'src/sheep/sheep.module';
+import { PaddocksModule } from 'src/paddocks/paddocks.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([SheepCollarEntity]), CollarsModule, SheepModule],
+  imports: [TypeOrmModule.forFeature([SheepCollarEntity]), CollarsModule, SheepModule, PaddocksModule],
   controllers: [SheepCollarController],
   providers: [SheepCollarService],
 })

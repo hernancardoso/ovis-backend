@@ -1,4 +1,5 @@
 import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
+import { PaddockEntity } from 'src/paddocks/entities/paddock.entity';
 import { SheepCollarEntity } from 'src/sheep-collar/entities/sheep-collar.entity';
 import { PrimaryGeneratedColumn, Column, OneToMany, Entity, ManyToOne, JoinColumn } from 'typeorm';
 
@@ -10,12 +11,12 @@ export class SheepEntity {
   @Column()
   name: string;
 
-  @ManyToOne(() => EstablishmentEntity, (establishment) => establishment.sheeps)
-  @JoinColumn({ name: 'establishmentId' })
-  establishment: EstablishmentEntity | null;
+  @ManyToOne(() => PaddockEntity, (paddock) => paddock.sheep)
+  @JoinColumn({ name: 'paddockId' })
+  paddock: PaddockEntity;
 
   @Column({ nullable: false })
-  establishmentId: EstablishmentEntity['id'];
+  paddockId: PaddockEntity['id'];
 
   @OneToMany(() => SheepCollarEntity, (sheepCollar) => sheepCollar.collar)
   collars: SheepCollarEntity[];

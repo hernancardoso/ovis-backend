@@ -11,17 +11,13 @@ export class CollarEntity extends TimestampedEntity {
   @Column()
   name: string;
 
-  @ManyToOne(() => EstablishmentEntity, (establishment) => establishment.collars, { nullable: false })
+  @ManyToOne(() => EstablishmentEntity, (establishment) => establishment.collars)
   @JoinColumn({ name: 'establishmentId' })
   establishment: EstablishmentEntity;
 
-  // @Column({ nullable: false })
-  // establishmentId: EstablishmentEntity['id'];
+  @Column({ nullable: false })
+  establishmentId: EstablishmentEntity['id'];
 
   @OneToMany(() => SheepCollarEntity, (sheepCollar) => sheepCollar.collar)
   sheep: SheepCollarEntity[];
 }
-
-// interface CollarWith extends CollarEntity {
-//   establishment: NonNullable<CollarEntity['establishment']>;
-// }

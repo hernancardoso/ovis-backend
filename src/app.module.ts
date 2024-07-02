@@ -13,6 +13,7 @@ import authConfig from './config/auth.config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TypeOrmConfigService } from './datasource/typeorm-config.service';
 import { SheepCollarModule } from './sheep-collar/sheep-collar.module';
+import { PaddocksModule } from './paddocks/paddocks.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { SheepCollarModule } from './sheep-collar/sheep-collar.module';
     SheepModule,
     AuthModule,
     SheepCollarModule,
+    PaddocksModule,
   ],
   controllers: [AppController],
   providers: [AppService],

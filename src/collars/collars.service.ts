@@ -5,6 +5,7 @@ import { CollarEntity } from './entities/collar.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { EstablishmentsService } from 'src/establishments/establishments.service';
+import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
 
 @Injectable()
 export class CollarsService {
@@ -16,11 +17,9 @@ export class CollarsService {
     private establishmentService: EstablishmentsService
   ) {}
 
-  async create(createCollarDto: CreateCollarDto) {
+  async create(establishmentId: EstablishmentEntity['id'], createCollarDto: CreateCollarDto) {
     const collar = this.collarRepository.create(createCollarDto);
-
-    const establishment = await this.establishmentService.findById(createCollarDto.establishmentId);
-    collar.establishment = establishment;
+    collar.establishmentId = establishmentId;
 
     return this.collarRepository.save(collar);
   }
@@ -29,10 +28,7 @@ export class CollarsService {
     const collar = await this.findByIdOrFail(id);
     collar.name = updateCollarDto.name ?? collar.name;
 
-    if (updateCollarDto.establishmentId && collar.establishment?.id !== updateCollarDto.establishmentId)
-      collar.establishment = await this.establishmentService.findById(updateCollarDto.establishmentId);
-
-    return this.collarRepository.save(collar);
+    return await this.collarRepository.save(collar);
   }
 
   findAll() {

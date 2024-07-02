@@ -12,6 +12,7 @@ import { CollarEntity } from 'src/collars/entities/collar.entity';
 import { UnassignCollarToSheepDto } from './dto/unassign-collar-to-sheep.dto copy';
 import { SheepService } from 'src/sheep/sheep.service';
 import { CollarsService } from 'src/collars/collars.service';
+import { PaddocksService } from 'src/paddocks/paddocks.service';
 
 @Injectable()
 export class SheepCollarService {
@@ -19,7 +20,8 @@ export class SheepCollarService {
     @InjectRepository(SheepCollarEntity)
     private sheepCollarRepository: Repository<SheepCollarEntity>,
     private collarService: CollarsService,
-    private sheepService: SheepService
+    private sheepService: SheepService,
+    private paddocksService: PaddocksService
   ) {}
 
   async findActiveAssociationsOf(collarId: string, sheepId: string) {
@@ -50,10 +52,10 @@ export class SheepCollarService {
 
     const [collar, sheep] = await Promise.all([
       this.collarService.findByIdOrFail(collarId),
-      this.sheepService.findByIdOrFail(sheepId),
+      this.sheepService.findByIdOrFail(sheepId, ['paddock']),
     ]);
 
-    if (collar.establishment?.id !== sheep.establishment?.id)
+    if (collar.establishmentId !== sheep.paddock.establishmentId)
       throw new Error('Collar and sheep are not in the same establishment');
 
     const association = this.sheepCollarRepository.create({ collarId, sheepId, assignedFrom });
