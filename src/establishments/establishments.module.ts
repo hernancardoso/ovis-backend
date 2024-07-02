@@ -7,10 +7,7 @@ import { CollarsModule } from 'src/collars/collars.module';
 import { CollarEntity } from 'src/collars/entities/collar.entity';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([EstablishmentEntity]),
-    forwardRef(() => CollarsModule),
-  ],
+  imports: [TypeOrmModule.forFeature([EstablishmentEntity]), forwardRef(() => CollarsModule)],
   controllers: [EstablishmentsController],
   providers: [EstablishmentsService],
   exports: [EstablishmentsService],

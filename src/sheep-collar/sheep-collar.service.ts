@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CreateSheepCollarDto } from './dto/create-sheep-collar.dto';
 import { UpdateSheepCollarDto } from './dto/update-sheep-collar.dto';
 import { SheepCollarEntity } from './entities/sheep-collar.entity';
@@ -9,56 +9,70 @@ import { CollarDto } from 'src/collars/dto/collar.dto';
 import { AssignCollarToSheepDto } from './dto/assign-collar-to-sheep.dto';
 import { SheepEntity } from 'src/sheep/entities/sheep.entity';
 import { CollarEntity } from 'src/collars/entities/collar.entity';
+import { UnassignCollarToSheepDto } from './dto/unassign-collar-to-sheep.dto copy';
+import { SheepService } from 'src/sheep/sheep.service';
+import { CollarsService } from 'src/collars/collars.service';
 
 @Injectable()
 export class SheepCollarService {
   constructor(
     @InjectRepository(SheepCollarEntity)
-    private sheepCollarRepository: Repository<SheepCollarEntity>
+    private sheepCollarRepository: Repository<SheepCollarEntity>,
+    private collarService: CollarsService,
+    private sheepService: SheepService
   ) {}
 
-  private async findAssignedSheep(sheepId: SheepEntity['id']) {
-    return await this.sheepCollarRepository.findOne({
-      where: { sheep: { id: sheepId }, assignedUntil: IsNull() },
+  async findActiveAssociationsOf(collarId: string, sheepId: string) {
+    const associations = await this.sheepCollarRepository.find({
+      relations: ['collar', 'sheep'],
+      take: 2,
+      where: [
+        { collar: { id: collarId }, assignedUntil: IsNull() },
+        { sheep: { id: sheepId }, assignedUntil: IsNull() },
+      ],
       order: { id: 'DESC' },
     });
-  }
 
-  private async findAssignedCollar(collarId: CollarEntity['id']): Promise<Omit<SheepCollarEntity, 'collar'> | null> {
-    const sheepCollar = await this.sheepCollarRepository.findOne({
-      where: { collar: { id: collarId }, assignedUntil: IsNull() },
-      order: { id: 'DESC' },
-    });
-
-    if (!sheepCollar) {
-      return null;
-    }
-
-    return sheepCollar as Omit<SheepCollarEntity, 'collar'>;
+    return {
+      collar: associations.find((a) => a.collar.id === collarId)?.collar,
+      sheep: associations.find((a) => a.sheep.id === sheepId)?.sheep,
+    };
   }
 
   async assign(assignCollarToSheepDto: AssignCollarToSheepDto) {
-    if (!assignCollarToSheepDto.assignedFrom) assignCollarToSheepDto.assignedFrom = new Date();
-    const { collarId, sheepId, assignedFrom } = assignCollarToSheepDto;
+    const { collarId, sheepId } = assignCollarToSheepDto;
+    const assignedFrom = assignCollarToSheepDto.assignedFrom || new Date();
 
-    // Check that the collar or the sheep is not in use
-    const collar = await this.findAssignedCollar(collarId);
-    console.log(collar);
-    const sheep = (await this.findAssignedSheep(sheepId))?.sheep;
+    const { collar: associatedCollar, sheep: associatedSheep } = await this.findActiveAssociationsOf(collarId, sheepId);
 
-    if (collar) throw new Error(`The collar ${collar.id} is already in use`);
-    if (sheep) throw new Error(`The sheep ${sheep.id} is already in use`);
-    Logger.warn(`Params ${collarId}, ${sheepId}`, 'WARNING PARAMETERS');
+    if (associatedCollar) throw new Error(`The collar ${associatedCollar.id} - (${associatedCollar.name}) is already in use`);
+    if (associatedSheep) throw new Error(`The collar ${associatedSheep.id} - (${associatedSheep.name}) is already in use`);
 
-    const association = this.sheepCollarRepository.create(assignCollarToSheepDto);
+    const [collar, sheep] = await Promise.all([
+      this.collarService.findByIdOrFail(collarId),
+      this.sheepService.findByIdOrFail(sheepId),
+    ]);
 
+    if (collar.establishment?.id !== sheep.establishment?.id)
+      throw new Error('Collar and sheep are not in the same establishment');
+
+    const association = this.sheepCollarRepository.create({ collarId, sheepId, assignedFrom });
     try {
-      await this.sheepCollarRepository.save(association);
+      return await this.sheepCollarRepository.save(association);
     } catch (e) {
-      Logger.warn(e, 'error');
-      console.log(e, typeof e);
-      throw new Error('Not killing things');
+      Logger.error(e, 'SHEEP-COLLAR');
     }
+  }
+
+  async unassign(unassignCollarToSheepDto: UnassignCollarToSheepDto) {
+    const { sheepId, collarId } = unassignCollarToSheepDto;
+    const association = await this.sheepCollarRepository.findOne({
+      where: { sheepId, collarId, assignedUntil: IsNull() },
+      order: { id: 'DESC' },
+    });
+    if (!association) throw new NotFoundException('Association not found');
+    association.assignedUntil = new Date();
+    return this.sheepCollarRepository.save(association);
   }
 
   create(createSheepCollarDto: CreateSheepCollarDto) {

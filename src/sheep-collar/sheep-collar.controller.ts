@@ -3,6 +3,7 @@ import { SheepCollarService } from './sheep-collar.service';
 import { CreateSheepCollarDto } from './dto/create-sheep-collar.dto';
 import { UpdateSheepCollarDto } from './dto/update-sheep-collar.dto';
 import { AssignCollarToSheepDto } from './dto/assign-collar-to-sheep.dto';
+import { UnassignCollarToSheepDto } from './dto/unassign-collar-to-sheep.dto copy';
 
 @Controller('sheep-collar')
 export class SheepCollarController {
@@ -11,6 +12,11 @@ export class SheepCollarController {
   @Post('/assign')
   assign(@Body() assignCollarToSheepDto: AssignCollarToSheepDto) {
     return this.sheepCollarService.assign(assignCollarToSheepDto);
+  }
+
+  @Post('/unassign')
+  unassign(@Body() unassignCollarToSheepDto: UnassignCollarToSheepDto) {
+    return this.sheepCollarService.unassign(unassignCollarToSheepDto);
   }
 
   @Post()

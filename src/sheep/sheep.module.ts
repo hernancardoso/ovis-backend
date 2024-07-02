@@ -8,5 +8,6 @@ import { SheepEntity } from './entities/sheep.entity';
   imports: [TypeOrmModule.forFeature([SheepEntity])],
   controllers: [SheepController],
   providers: [SheepService],
+  exports: [SheepService],
 })
 export class SheepModule {}

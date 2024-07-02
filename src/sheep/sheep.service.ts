@@ -9,10 +9,21 @@ import { Repository } from 'typeorm';
 export class SheepService {
   constructor(
     @InjectRepository(SheepEntity)
-    private sheepEntity: Repository<SheepEntity>
+    private sheepRepository: Repository<SheepEntity>
   ) {}
+
   async create(createSheepDto: CreateSheepDto) {
-    await this.sheepEntity.save(this.sheepEntity.create(createSheepDto));
+    const sheep = this.sheepRepository.create(createSheepDto);
+
+    // const establishment = await this.establishmentService.findById(createCollarDto.establishmentId);
+    // collar.establishment = establishment;
+
+    return this.sheepRepository.save(sheep);
+  }
+
+  findByIdOrFail(id: string) {
+    if (!id) throw new Error('La id del collar no puede ser vacía');
+    return this.sheepRepository.findOneByOrFail({ id: id ?? '' });
   }
 
   findAll() {
