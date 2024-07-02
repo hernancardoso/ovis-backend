@@ -1,4 +1,4 @@
-import { collarSchema } from 'src/collars/schema/collar.schema';
+import { collarSchema } from 'src/collars/schemas/collar.schema';
 import { z } from 'zod';
 
 export const establishmentSchema = z.object({
