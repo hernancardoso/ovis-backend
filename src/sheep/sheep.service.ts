@@ -4,6 +4,7 @@ import { UpdateSheepDto } from './dto/update-sheep.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { SheepEntity } from './entities/sheep.entity';
 import { Repository } from 'typeorm';
+import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
 
 @Injectable()
 export class SheepService {
@@ -12,8 +13,8 @@ export class SheepService {
     private sheepRepository: Repository<SheepEntity>
   ) {}
 
-  async create(createSheepDto: CreateSheepDto) {
-    const sheep = this.sheepRepository.create(createSheepDto);
+  async create(establishmentId: EstablishmentEntity['id'], createSheepDto: CreateSheepDto) {
+    const sheep = this.sheepRepository.create({ establishmentId, ...createSheepDto });
 
     // const establishment = await this.establishmentService.findById(createCollarDto.establishmentId);
     // collar.establishment = establishment;

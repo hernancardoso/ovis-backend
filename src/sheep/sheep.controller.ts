@@ -2,14 +2,15 @@ import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/commo
 import { SheepService } from './sheep.service';
 import { CreateSheepDto } from './dto/create-sheep.dto';
 import { UpdateSheepDto } from './dto/update-sheep.dto';
+import { UserEstablishmentId } from 'src/commons/decorators/user-establishment-id.decorator';
 
 @Controller('sheep')
 export class SheepController {
   constructor(private readonly sheepService: SheepService) {}
 
   @Post()
-  create(@Body() createSheepDto: CreateSheepDto) {
-    return this.sheepService.create(createSheepDto);
+  create(@UserEstablishmentId() establishmentId: string, @Body() createSheepDto: CreateSheepDto) {
+    return this.sheepService.create(establishmentId, createSheepDto);
   }
 
   @Get()
