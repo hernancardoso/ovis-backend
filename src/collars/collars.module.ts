@@ -6,10 +6,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { EstablishmentsModule } from 'src/establishments/establishments.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([CollarEntity]),
-    forwardRef(() => EstablishmentsModule),
-  ],
+  imports: [TypeOrmModule.forFeature([CollarEntity]), forwardRef(() => EstablishmentsModule)],
   controllers: [CollarsController],
   providers: [CollarsService],
   exports: [CollarsService],

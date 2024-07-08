@@ -8,6 +8,10 @@ import { Repository, In } from 'typeorm';
 import { CollarsService } from 'src/collars/collars.service';
 
 import { Collar } from 'src/collars/models/collar.model';
+import { BreedsService } from 'src/breeds/breeds.service';
+import { BreedsEntity } from 'src/breeds/entities/breed.entity';
+import { UpdateBreedsDto } from './dto/update-breeds.dto';
+import { FindOneOptions, FindOptionsWhere, FindOptionsRelations } from 'typeorm';
 
 @Injectable()
 export class EstablishmentsService {
@@ -15,23 +19,17 @@ export class EstablishmentsService {
     @InjectRepository(EstablishmentEntity)
     private establishmentRepository: Repository<EstablishmentEntity>,
     @Inject(forwardRef(() => CollarsService))
-    private collarService: CollarsService
+    private collarService: CollarsService,
+    private readonly breedsService: BreedsService
   ) {}
 
-  async create(
-    createEstablishmentDto: CreateEstablishmentDto
-  ): Promise<EstablishmentEntity> {
-    const establishment = this.establishmentRepository.create(
-      createEstablishmentDto
-    );
+  async create(createEstablishmentDto: CreateEstablishmentDto): Promise<EstablishmentEntity> {
+    const establishment = this.establishmentRepository.create(createEstablishmentDto);
 
     if (createEstablishmentDto?.collarIds?.length) {
-      const collars = await this.collarService.findByIds(
-        createEstablishmentDto.collarIds
-      );
+      const collars = await this.collarService.findByIds(createEstablishmentDto.collarIds);
 
-      if (collars.length !== createEstablishmentDto.collarIds.length)
-        throw new Error('One or more collar IDs are invalid');
+      if (collars.length !== createEstablishmentDto.collarIds.length) throw new Error('One or more collar IDs are invalid');
 
       establishment.collars = collars;
     }
@@ -44,16 +42,32 @@ export class EstablishmentsService {
     establishment.name = updateEstablishmentDto.name ?? establishment.name; //if updateEstablishmentDto.name is empty use the last name saved
 
     if (updateEstablishmentDto.collarIds?.length) {
-      const newCollars = await this.collarService.findByIds(
-        updateEstablishmentDto.collarIds
-      );
-      if (newCollars.length !== updateEstablishmentDto.collarIds.length)
-        throw new Error('One or more collar IDs are invalid');
+      const newCollars = await this.collarService.findByIds(updateEstablishmentDto.collarIds);
+      if (newCollars.length !== updateEstablishmentDto.collarIds.length) throw new Error('One or more collar IDs are invalid');
 
       establishment.collars = newCollars;
     }
 
     return this.establishmentRepository.save(establishment);
+  }
+
+  async listBreeds(id: EstablishmentEntity['id']): Promise<BreedsEntity[] | []> {
+    const establishment = await this.establishmentRepository.findOne({ where: { id }, relations: ['breeds'] });
+    return establishment?.breeds ?? [];
+  }
+
+  async updateBreeds(id: EstablishmentEntity['id'], updateBreedsDto: UpdateBreedsDto) {
+    const establishment = await this.establishmentRepository.findOneOrFail({ where: { id }, relations: ['breeds'] });
+    const breeds = await this.breedsService.find(updateBreedsDto.breedsIds);
+
+    establishment.breeds = breeds;
+
+    return this.establishmentRepository.save(establishment);
+  }
+
+  async findByIdOrFail(id: string, relations?: (keyof FindOptionsRelations<EstablishmentEntity>)[]) {
+    if (!id) throw new Error('La id del collar no puede ser vacía');
+    return await this.establishmentRepository.findOneOrFail({ where: { id: id ?? '' }, relations });
   }
 
   async findAll() {

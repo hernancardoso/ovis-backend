@@ -15,8 +15,8 @@ export class PaddocksController {
   }
 
   @Get()
-  findAll() {
-    return this.paddocksService.findAll();
+  findAll(@UserEstablishmentId() establishmentId: EstablishmentEntity['id']) {
+    return this.paddocksService.findAll(establishmentId);
   }
 
   @Get(':id')

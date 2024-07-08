@@ -15,6 +15,12 @@ bootstrap();
 
 async function bootstrapApp() {
   const app = await NestFactory.create(AppModule);
+  app.enableCors({
+    allowedHeaders: '*',
+    origin: '*',
+    credentials: true,
+    methods: '*',
+  });
   await app.listen(3000);
 }
 bootstrapApp();

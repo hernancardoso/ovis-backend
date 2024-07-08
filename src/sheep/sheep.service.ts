@@ -5,7 +5,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { SheepEntity } from './entities/sheep.entity';
 import { Repository } from 'typeorm';
 import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
-import { EstablishmentsService } from 'src/establishments/establishments.service';
 import { PaddocksService } from 'src/paddocks/paddocks.service';
 
 @Injectable()
@@ -26,21 +25,30 @@ export class SheepService {
     return this.sheepRepository.save(sheep);
   }
 
-  findByIdOrFail(id: string, relations: ('paddock' | 'collar')[] = []) {
+  async findByIdOrFail(id: string, relations: ('paddock' | 'collar')[] = []) {
     if (!id) throw new Error('La id del collar no puede ser vacía');
-    return this.sheepRepository.findOneOrFail({ where: { id: id ?? '' }, relations });
+    return await this.sheepRepository.findOneOrFail({ where: { id: id ?? '' }, relations });
   }
 
   findAll() {
     return `This action returns all sheep`;
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} sheep`;
+  async findOne(id: SheepEntity['id']) {
+    return this.sheepRepository.findOneByOrFail({ id });
   }
 
-  update(id: number, updateSheepDto: UpdateSheepDto) {
-    return `This action updates a #${id} sheep`;
+  async update(establishmentId: EstablishmentEntity['id'], id: string, updateSheepDto: UpdateSheepDto) {
+    const sheep = await this.findByIdOrFail(id, ['paddock']);
+    if (sheep.paddock.establishmentId !== establishmentId) {
+      throw new UnauthorizedException('La oveja no pertenece al establecimiento');
+    }
+    const updatedSheep = this.sheepRepository.merge(sheep, updateSheepDto);
+    try {
+      return await this.sheepRepository.save(updatedSheep);
+    } catch (e) {
+      throw new Error('Error al actualizar la oveja');
+    }
   }
 
   remove(id: number) {

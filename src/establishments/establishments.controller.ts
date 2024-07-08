@@ -1,25 +1,39 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Put } from '@nestjs/common';
 import { EstablishmentsService } from './establishments.service';
 import { CreateEstablishmentDto } from './dto/create-establishment.dto';
 import { UpdateEstablishmentDto } from './dto/update-establishment.dto';
+import { EstablishmentEntity } from './entities/establishment.entity';
+import { UpdateBreedsDto } from './dto/update-breeds.dto';
+import { UserEstablishmentId } from 'src/commons/decorators/user-establishment-id.decorator';
 
 @Controller('establishments')
 export class EstablishmentsController {
   constructor(private readonly establishmentsService: EstablishmentsService) {}
+
+  @Get(':id/breeds')
+  listBreeds(@Param('id') establishmentId: EstablishmentEntity['id']) {
+    return this.establishmentsService.listBreeds(establishmentId);
+  }
+
+  @Put(':id/breeds')
+  updateBreeds(@Param('id') establishmentId: EstablishmentEntity['id'], @Body() updateBreedsDto: UpdateBreedsDto) {
+    return this.establishmentsService.updateBreeds(establishmentId, updateBreedsDto);
+  }
 
   @Post()
   create(@Body() createEstablishmentDto: CreateEstablishmentDto) {
     return this.establishmentsService.create(createEstablishmentDto);
   }
 
-  @Get()
+  @Get('all')
   findAll() {
     return this.establishmentsService.findAll();
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.establishmentsService.findOne(id);
+  @Get()
+  findOne(@UserEstablishmentId() establishmentId: EstablishmentEntity['id']) {
+    console.log('this aws called');
+    return this.establishmentsService.findByIdOrFail(establishmentId, ['breeds', 'paddocks', 'collars']);
   }
 
   @Get(':id/collars')

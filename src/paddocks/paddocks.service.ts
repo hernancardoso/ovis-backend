@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PaddockEntity } from './entities/paddock.entity';
 import { Repository } from 'typeorm';
 import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
+import { UserEstablishmentId } from 'src/commons/decorators/user-establishment-id.decorator';
 
 @Injectable()
 export class PaddocksService {
@@ -20,8 +21,8 @@ export class PaddocksService {
     return await this.paddockRepository.save(paddock);
   }
 
-  findAll() {
-    return `This action returns all paddocks`;
+  async findAll(establishmentId: EstablishmentEntity['id']) {
+    return this.paddockRepository.findBy({ establishmentId });
   }
 
   async findOne(id: string) {

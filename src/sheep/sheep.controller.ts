@@ -20,12 +20,12 @@ export class SheepController {
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.sheepService.findOne(+id);
+    return this.sheepService.findOne(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateSheepDto: UpdateSheepDto) {
-    return this.sheepService.update(+id, updateSheepDto);
+  update(@UserEstablishmentId() establishmentId: string, @Param('id') id: string, @Body() updateSheepDto: UpdateSheepDto) {
+    return this.sheepService.update(establishmentId, id, updateSheepDto);
   }
 
   @Delete(':id')
