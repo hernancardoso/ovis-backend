@@ -1,10 +1,4 @@
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Logger,
-  Post,
-} from '@nestjs/common';
+import { BadRequestException, Body, Controller, Logger, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
 
 @Controller('auth')

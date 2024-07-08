@@ -23,7 +23,7 @@ export class SheepEntity extends TimestampedEntity {
   @Column()
   breedId: BreedsEntity['id'];
 
-  @Column({ type: 'simple-array', default: [] })
+  @Column({ type: 'simple-array' })
   tags: string[];
 
   @ManyToOne(() => PaddockEntity, (paddock) => paddock.sheep)
