@@ -4,6 +4,7 @@ import 'reflect-metadata';
 import 'dotenv/config';
 import { bootstrap } from 'global-agent';
 import { AuthGuard } from './commons/guards/auth.guard';
+import { ValidationPipe } from '@nestjs/common';
 
 // Set the global environment variables for the proxy
 process.env.GLOBAL_AGENT_HTTP_PROXY = process.env.HTTP_PROXY;
@@ -17,6 +18,7 @@ bootstrap();
 async function bootstrapApp() {
   const app = await NestFactory.create(AppModule);
   const reflector = app.get(Reflector);
+  app.useGlobalPipes(new ValidationPipe());
   app.useGlobalGuards(new AuthGuard(reflector));
   app.enableCors({
     allowedHeaders: '*',
