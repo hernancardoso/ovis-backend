@@ -1,24 +1,14 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  AuthenticationDetails,
-  CognitoUser,
-  CognitoUserPool,
-} from 'amazon-cognito-identity-js';
-import {
-  IAuthConfig,
-  IConfigService,
-} from 'src/config/interfaces/config.interface';
+import { AuthenticationDetails, CognitoUser, CognitoUserPool } from 'amazon-cognito-identity-js';
+import { CognitoConfig, IConfigService } from 'src/config/interfaces/config.interface';
 
 @Injectable()
 export class AuthService {
   private userPool: CognitoUserPool;
 
-  constructor(
-    private readonly configService: ConfigService<IConfigService, true>
-  ) {
-    const { userPoolId, clientId } =
-      this.configService.get<IAuthConfig>('auth');
+  constructor(private readonly configService: ConfigService<IConfigService, true>) {
+    const { userPoolId, clientId } = this.configService.get<CognitoConfig>('cognito');
 
     this.userPool = new CognitoUserPool({
       UserPoolId: userPoolId,
@@ -27,6 +17,7 @@ export class AuthService {
   }
 
   authenticateUser(user: { name: string; password: string }) {
+    console.log('no deberia entrara aca');
     const { name, password } = user;
 
     const authenticationDetails = new AuthenticationDetails({
