@@ -19,7 +19,9 @@ async function bootstrapApp() {
   const app = await NestFactory.create(AppModule);
   const reflector = app.get(Reflector);
   app.useGlobalPipes(new ValidationPipe());
+
   app.useGlobalGuards(new AuthGuard(reflector));
+
   app.enableCors({
     allowedHeaders: '*',
     origin: '*',

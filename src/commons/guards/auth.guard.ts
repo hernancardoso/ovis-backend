@@ -9,9 +9,9 @@ export class AuthGuard extends PassportAuthGaurd('jwt') {
   }
 
   canActivate(context: ExecutionContext) {
-    const isPublic = this.reflector.get<boolean>('isPublic', context.getClass());
+    const isPublicRoute = this.reflector.get<boolean>('isPublicRoute', context.getClass());
 
-    if (isPublic) {
+    if (isPublicRoute) {
       return true;
     }
 

@@ -7,19 +7,18 @@ import { CognitoConfig, IConfigService } from 'src/config/interfaces/config.inte
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(private readonly configService: ConfigService<IConfigService, true>) {
-    const cognito = configService.get<CognitoConfig>('cognito');
+  constructor() {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      audience: cognito.clientId,
-      issuer: cognito.authority,
+
+      issuer: 'https://cognito-idp.us-east-1.amazonaws.com/us-east-1_hZaNEqLFK',
       algorithms: ['RS256'],
       secretOrKeyProvider: passportJwtSecret({
         cache: true,
         rateLimit: true,
         jwksRequestsPerMinute: 5,
-        jwksUri: cognito.authority + '/.well-known/jwks.json',
+        jwksUri: 'https://cognito-idp.us-east-1.amazonaws.com/us-east-1_hZaNEqLFK/.well-known/jwks.json',
       }),
     });
   }

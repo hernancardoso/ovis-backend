@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Put } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Put, UseGuards } from '@nestjs/common';
 import { EstablishmentsService } from './establishments.service';
 import { CreateEstablishmentDto } from './dto/create-establishment.dto';
 import { UpdateEstablishmentDto } from './dto/update-establishment.dto';
 import { EstablishmentEntity } from './entities/establishment.entity';
 import { UpdateBreedsDto } from './dto/update-breeds.dto';
 import { UserEstablishmentId } from 'src/commons/decorators/user-establishment-id.decorator';
+import { ProtectedRoute } from 'src/commons/decorators/protected-route.decorator';
 
 @Controller('establishments')
 export class EstablishmentsController {
