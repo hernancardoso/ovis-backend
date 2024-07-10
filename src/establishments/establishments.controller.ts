@@ -4,8 +4,8 @@ import { CreateEstablishmentDto } from './dto/create-establishment.dto';
 import { UpdateEstablishmentDto } from './dto/update-establishment.dto';
 import { EstablishmentEntity } from './entities/establishment.entity';
 import { UpdateBreedsDto } from './dto/update-breeds.dto';
-import { UserEstablishmentId } from 'src/commons/decorators/user-establishment-id.decorator';
-import { ProtectedRoute } from 'src/commons/decorators/protected-route.decorator';
+import { User } from 'src/commons/decorators/user.decorator';
+import { User as IUser } from 'src/commons/interfaces/user.interface';
 
 @Controller('establishments')
 export class EstablishmentsController {
@@ -32,8 +32,7 @@ export class EstablishmentsController {
   }
 
   @Get()
-  findOne(@UserEstablishmentId() establishmentId: EstablishmentEntity['id']) {
-    console.log('this aws called');
+  findOne(@User('establishmentId') establishmentId: IUser['establishmentId']) {
     return this.establishmentsService.findByIdOrFail(establishmentId, ['breeds', 'paddocks', 'collars']);
   }
 

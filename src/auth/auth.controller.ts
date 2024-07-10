@@ -2,7 +2,7 @@ import { Body, Controller, Post, UsePipes, ValidationPipe } from '@nestjs/common
 import { AwsCognitoService } from './aws-cognito.service';
 import { RegisterUserDto } from './dtos/register-user.dto';
 import { LoginUserDto } from './dtos/login-user.dto';
-import { Public } from 'src/commons/decorators/public.decorator';
+import { Public } from 'src/commons/decorators/public-route.decorator';
 import { ChangePasswordUserDto } from './dtos/change-password-user.dto';
 import { ForgotPasswordUserDto } from './dtos/forgot-password-user.dto';
 import { ConfirmPasswordUserDto } from './dtos/confirm-password-user.dto';

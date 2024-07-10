@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { AuthenticationDetails, CognitoUser, CognitoUserAttribute, CognitoUserPool } from 'amazon-cognito-identity-js';
+import {
+  AuthenticationDetails,
+  CognitoUser,
+  CognitoUserAttribute,
+  CognitoUserPool,
+  CognitoUserSession,
+} from 'amazon-cognito-identity-js';
 import { LoginUserDto } from './dtos/login-user.dto';
 import { RegisterUserDto } from './dtos/register-user.dto';
 import { ConfigService } from '@nestjs/config';
@@ -64,8 +70,9 @@ export class AwsCognitoService {
 
     return new Promise((resolve, reject) => {
       userCognito.authenticateUser(authenticationDetails, {
-        onSuccess: (result) => {
+        onSuccess: (result: CognitoUserSession) => {
           resolve({
+            idToken: result.getIdToken().getJwtToken(),
             accessToken: result.getAccessToken().getJwtToken(),
             refreshToken: result.getRefreshToken().getToken(),
           });
