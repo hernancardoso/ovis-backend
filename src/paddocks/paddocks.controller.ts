@@ -2,20 +2,20 @@ import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/commo
 import { PaddocksService } from './paddocks.service';
 import { CreatePaddockDto } from './dto/create-paddock.dto';
 import { UpdatePaddockDto } from './dto/update-paddock.dto';
-import { UserEstablishmentId } from 'src/commons/decorators/user-establishment-id.decorator';
 import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
+import { User } from 'src/commons/decorators/user.decorator';
 
 @Controller('paddocks')
 export class PaddocksController {
   constructor(private readonly paddocksService: PaddocksService) {}
 
   @Post()
-  create(@UserEstablishmentId() establishmentId: EstablishmentEntity['id'], @Body() createPaddockDto: CreatePaddockDto) {
+  create(@User('establishmentId') establishmentId: EstablishmentEntity['id'], @Body() createPaddockDto: CreatePaddockDto) {
     return this.paddocksService.create(establishmentId, createPaddockDto);
   }
 
   @Get()
-  findAll(@UserEstablishmentId() establishmentId: EstablishmentEntity['id']) {
+  findAll(@User('establishmentId') establishmentId: EstablishmentEntity['id']) {
     return this.paddocksService.findAll(establishmentId);
   }
 

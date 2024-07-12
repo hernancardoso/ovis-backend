@@ -2,14 +2,15 @@ import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/commo
 import { SheepService } from './sheep.service';
 import { CreateSheepDto } from './dto/create-sheep.dto';
 import { UpdateSheepDto } from './dto/update-sheep.dto';
-import { UserEstablishmentId } from 'src/commons/decorators/user-establishment-id.decorator';
+import { User } from 'src/commons/decorators/user.decorator';
+import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
 
 @Controller('sheep')
 export class SheepController {
   constructor(private readonly sheepService: SheepService) {}
 
   @Post()
-  create(@UserEstablishmentId() establishmentId: string, @Body() createSheepDto: CreateSheepDto) {
+  create(@User('establishmentId') establishmentId: EstablishmentEntity['id'], @Body() createSheepDto: CreateSheepDto) {
     return this.sheepService.create(establishmentId, createSheepDto);
   }
 
@@ -24,7 +25,11 @@ export class SheepController {
   }
 
   @Patch(':id')
-  update(@UserEstablishmentId() establishmentId: string, @Param('id') id: string, @Body() updateSheepDto: UpdateSheepDto) {
+  update(
+    @User('establishmentId') establishmentId: EstablishmentEntity['id'],
+    @Param('id') id: string,
+    @Body() updateSheepDto: UpdateSheepDto
+  ) {
     return this.sheepService.update(establishmentId, id, updateSheepDto);
   }
 

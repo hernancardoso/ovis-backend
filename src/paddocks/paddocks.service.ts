@@ -5,7 +5,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PaddockEntity } from './entities/paddock.entity';
 import { Repository } from 'typeorm';
 import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
-import { UserEstablishmentId } from 'src/commons/decorators/user-establishment-id.decorator';
 
 @Injectable()
 export class PaddocksService {
