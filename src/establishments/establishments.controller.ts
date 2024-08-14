@@ -31,8 +31,13 @@ export class EstablishmentsController {
     return this.establishmentsService.findAll();
   }
 
-  @Get()
-  findOne(@User('establishmentId') establishmentId: IUser['establishmentId']) {
+  @Get(':id')
+  findOne(
+    @Param('id') establishmentId: EstablishmentEntity['id'],
+    @User('establishmentId') establishmentRequestId: IUser['establishmentId']
+  ) {
+    //if(establishmentId !== establishmentRequestId) throw Error("no puedes")
+    console.log('llegue aca?');
     return this.establishmentsService.findByIdOrFail(establishmentId, ['breeds', 'paddocks', 'collars']);
   }
 
