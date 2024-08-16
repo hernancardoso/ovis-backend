@@ -19,6 +19,7 @@ export class SheepService {
     const sheep = this.sheepRepository.create(createSheepDto);
 
     const paddock = await this.paddocksService.findOne(createSheepDto.paddockId);
+    console.log(sheep);
     if (paddock.establishmentId !== establishmentId)
       throw new UnauthorizedException('El paddock no pertenece al establecimiento');
 
@@ -30,8 +31,8 @@ export class SheepService {
     return await this.sheepRepository.findOneOrFail({ where: { id: id ?? '' }, relations });
   }
 
-  findAll() {
-    return `This action returns all sheep`;
+  async findAll(establishmentId: EstablishmentEntity['id']) {
+    return (await this.paddocksService.findAll(establishmentId)).flatMap((paddock) => paddock.sheep);
   }
 
   async findOne(id: SheepEntity['id']) {

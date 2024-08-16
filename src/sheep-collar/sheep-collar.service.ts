@@ -43,7 +43,7 @@ export class SheepCollarService {
 
   async assign(assignCollarToSheepDto: AssignCollarToSheepDto) {
     const { collarId, sheepId } = assignCollarToSheepDto;
-    const assignedFrom = assignCollarToSheepDto.assignedFrom || new Date();
+    const assignedFrom = assignCollarToSheepDto.assignedFrom ?? new Date();
 
     const { collar: associatedCollar, sheep: associatedSheep } = await this.findActiveAssociationsOf(collarId, sheepId);
 

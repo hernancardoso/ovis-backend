@@ -11,5 +11,6 @@ import { PaddocksModule } from 'src/paddocks/paddocks.module';
   imports: [TypeOrmModule.forFeature([SheepCollarEntity]), CollarsModule, SheepModule, PaddocksModule],
   controllers: [SheepCollarController],
   providers: [SheepCollarService],
+  exports: [SheepCollarModule],
 })
 export class SheepCollarModule {}

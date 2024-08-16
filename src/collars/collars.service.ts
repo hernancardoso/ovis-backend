@@ -6,22 +6,25 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { EstablishmentsService } from 'src/establishments/establishments.service';
 import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
+import { SheepCollarEntity } from 'src/sheep-collar/entities/sheep-collar.entity';
+import { SheepCollarService } from 'src/sheep-collar/sheep-collar.service';
 
 @Injectable()
 export class CollarsService {
   constructor(
     @InjectRepository(CollarEntity)
     private collarRepository: Repository<CollarEntity>,
-
-    @Inject(forwardRef(() => EstablishmentsService))
-    private establishmentService: EstablishmentsService
+    private sheepCollarService: SheepCollarService
   ) {}
 
   async create(establishmentId: EstablishmentEntity['id'], createCollarDto: CreateCollarDto) {
-    const collar = this.collarRepository.create(createCollarDto);
+    const { sheepId, ...collarData } = createCollarDto;
+    const collar = this.collarRepository.create(collarData);
     collar.establishmentId = establishmentId;
 
-    return this.collarRepository.save(collar);
+    const savedCollar = await this.collarRepository.save(collar);
+    if (sheepId) this.sheepCollarService.assign({ collarId: savedCollar.id, sheepId });
+    return savedCollar;
   }
 
   async update(id: string, updateCollarDto: UpdateCollarDto) {

@@ -3,7 +3,7 @@ import { CreatePaddockDto } from './dto/create-paddock.dto';
 import { UpdatePaddockDto } from './dto/update-paddock.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PaddockEntity } from './entities/paddock.entity';
-import { Repository } from 'typeorm';
+import { Repository, FindOptionsRelations } from 'typeorm';
 import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
 
 @Injectable()
@@ -21,7 +21,7 @@ export class PaddocksService {
   }
 
   async findAll(establishmentId: EstablishmentEntity['id']) {
-    return this.paddockRepository.findBy({ establishmentId });
+    return this.paddockRepository.find({ where: { establishmentId }, relations: ['sheep'] });
   }
 
   async findOne(id: string) {
