@@ -4,6 +4,7 @@ import { CreatePaddockDto } from './dto/create-paddock.dto';
 import { UpdatePaddockDto } from './dto/update-paddock.dto';
 import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
 import { User } from 'src/commons/decorators/user.decorator';
+import { PaddockEntity } from './entities/paddock.entity';
 
 @Controller('paddocks')
 export class PaddocksController {
@@ -25,8 +26,8 @@ export class PaddocksController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updatePaddockDto: UpdatePaddockDto) {
-    return this.paddocksService.update(+id, updatePaddockDto);
+  update(@Param('id') id: PaddockEntity['id'], @Body() updatePaddockDto: UpdatePaddockDto) {
+    return this.paddocksService.update(id, updatePaddockDto);
   }
 
   @Delete(':id')

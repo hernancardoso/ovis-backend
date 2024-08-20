@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { CreateSheepDto } from './dto/create-sheep.dto';
 import { UpdateSheepDto } from './dto/update-sheep.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -12,16 +12,18 @@ export class SheepService {
   constructor(
     @InjectRepository(SheepEntity)
     private sheepRepository: Repository<SheepEntity>,
+    @Inject(forwardRef(() => PaddocksService))
     private paddocksService: PaddocksService
   ) {}
 
   async create(establishmentId: EstablishmentEntity['id'], createSheepDto: CreateSheepDto) {
     const sheep = this.sheepRepository.create(createSheepDto);
 
-    const paddock = await this.paddocksService.findOne(createSheepDto.paddockId);
-    console.log(sheep);
-    if (paddock.establishmentId !== establishmentId)
-      throw new UnauthorizedException('El paddock no pertenece al establecimiento');
+    //const paddock = await this.paddocksService.findOne(createSheepDto.paddockId);
+
+    //console.log(sheep);
+    //if (paddock.establishmentId !== establishmentId)
+    //  throw new UnauthorizedException('El paddock no pertenece al establecimiento');
 
     return this.sheepRepository.save(sheep);
   }
@@ -32,7 +34,13 @@ export class SheepService {
   }
 
   async findAll(establishmentId: EstablishmentEntity['id']) {
-    return (await this.paddocksService.findAll(establishmentId)).flatMap((paddock) => paddock.sheep);
+    return (await this.paddocksService.findAll(establishmentId)).flatMap((paddock) => paddock.sheep).filter(Boolean);
+  }
+
+  async findByIds(ids: string[]): Promise<SheepEntity[]> {
+    console.log('llegue');
+
+    return this.sheepRepository.findBy({ id: In(ids) });
   }
 
   async findOne(id: SheepEntity['id']) {
@@ -55,4 +63,7 @@ export class SheepService {
   remove(id: number) {
     return `This action removes a #${id} sheep`;
   }
+}
+function In(ids: string[]): string | import('typeorm').FindOperator<string> | undefined {
+  throw new Error('Function not implemented.');
 }

@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CreateSheepCollarDto } from './dto/create-sheep-collar.dto';
 import { UpdateSheepCollarDto } from './dto/update-sheep-collar.dto';
 import { SheepCollarEntity } from './entities/sheep-collar.entity';
@@ -13,12 +13,14 @@ import { UnassignCollarToSheepDto } from './dto/unassign-collar-to-sheep.dto cop
 import { SheepService } from 'src/sheep/sheep.service';
 import { CollarsService } from 'src/collars/collars.service';
 import { PaddocksService } from 'src/paddocks/paddocks.service';
+import { Collar } from 'src/collars/models/collar.model';
 
 @Injectable()
 export class SheepCollarService {
   constructor(
     @InjectRepository(SheepCollarEntity)
     private sheepCollarRepository: Repository<SheepCollarEntity>,
+    @Inject(forwardRef(() => CollarsService))
     private collarService: CollarsService,
     private sheepService: SheepService,
     private paddocksService: PaddocksService

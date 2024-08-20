@@ -14,6 +14,7 @@ export class CollarsService {
   constructor(
     @InjectRepository(CollarEntity)
     private collarRepository: Repository<CollarEntity>,
+    @Inject(forwardRef(() => SheepCollarService))
     private sheepCollarService: SheepCollarService
   ) {}
 
@@ -34,8 +35,13 @@ export class CollarsService {
     return await this.collarRepository.save(collar);
   }
 
-  findAll() {
-    return `This action returns all collars`;
+  findAll(establishmentId: EstablishmentEntity['id']) {
+    //TODO
+    return this.collarRepository.findBy({ establishmentId });
+  }
+
+  findAllUnassigned(establishmentId: EstablishmentEntity['id']) {
+    return this.collarRepository.findBy({ establishmentId });
   }
 
   async findOne(id: string) {

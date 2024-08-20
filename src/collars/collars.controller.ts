@@ -16,8 +16,13 @@ export class CollarsController {
   }
 
   @Get()
-  findAll() {
-    return this.collarsService.findAll();
+  findAll(@User('establishmentId') establishmentId: EstablishmentEntity['id']) {
+    return this.collarsService.findAll(establishmentId);
+  }
+
+  @Get('unassigned')
+  findAllUnassigned(@User('establishmentId') establishmentId: EstablishmentEntity['id']) {
+    return this.collarsService.findAllUnassigned(establishmentId);
   }
 
   @Get(':id')

@@ -16,6 +16,7 @@ export class SheepController {
 
   @Get()
   findAll(@User('establishmentId') establishmentId: EstablishmentEntity['id']) {
+    console.log('listing sheep');
     return this.sheepService.findAll(establishmentId);
   }
 
