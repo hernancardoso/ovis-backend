@@ -6,6 +6,7 @@ import { Public } from 'src/commons/decorators/public-route.decorator';
 import { ChangePasswordUserDto } from './dtos/change-password-user.dto';
 import { ForgotPasswordUserDto } from './dtos/forgot-password-user.dto';
 import { ConfirmPasswordUserDto } from './dtos/confirm-password-user.dto';
+import { RefreshTokenUserDto } from './dtos/refresh-token-user.dto';
 
 @Public()
 @Controller('auth')
@@ -35,5 +36,10 @@ export class AuthController {
   @Post('/confirm-password')
   async confirmPassword(@Body() authConfirmPasswordUserDto: ConfirmPasswordUserDto) {
     return await this.awsCognitoService.confirmUserPassword(authConfirmPasswordUserDto);
+  }
+
+  @Post('/refresh-token')
+  async refreshToken(@Body() refreshTokenUserDto: RefreshTokenUserDto) {
+    return await this.awsCognitoService.refreshToken(refreshTokenUserDto);
   }
 }

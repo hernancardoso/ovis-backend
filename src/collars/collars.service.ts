@@ -40,8 +40,15 @@ export class CollarsService {
     return this.collarRepository.findBy({ establishmentId });
   }
 
-  findAllUnassigned(establishmentId: EstablishmentEntity['id']) {
-    return this.collarRepository.findBy({ establishmentId });
+  async findAllUnassigned(establishmentId: EstablishmentEntity['id']) {
+    const collars = await this.collarRepository.find({ where: { establishmentId }, relations: ['sheep'] });
+    // Sort the sheep collar association to get the first result, this should be the last association (0 position is the last insertion)
+    // If both assignedFrom and assignedUntil values are filled OR no entry was found then the collar is unassigned
+    collars.forEach((collar) =>
+      collar.sheep.sort((sheep_collar_assoc1, sheep_collar_assoc2) => sheep_collar_assoc2.id - sheep_collar_assoc1.id)
+    );
+
+    return collars.filter((collar) => collar.sheep.length === 0 || collar.sheep[0].assignedUntil);
   }
 
   async findOne(id: string) {

@@ -6,6 +6,7 @@ import { SheepEntity } from './entities/sheep.entity';
 import { Repository } from 'typeorm';
 import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
 import { PaddocksService } from 'src/paddocks/paddocks.service';
+import { SheepCollarService } from 'src/sheep-collar/sheep-collar.service';
 
 @Injectable()
 export class SheepService {
@@ -13,19 +14,18 @@ export class SheepService {
     @InjectRepository(SheepEntity)
     private sheepRepository: Repository<SheepEntity>,
     @Inject(forwardRef(() => PaddocksService))
-    private paddocksService: PaddocksService
+    private paddocksService: PaddocksService,
+    @Inject(forwardRef(() => SheepCollarService))
+    private sheepCollarService: SheepCollarService
   ) {}
 
   async create(establishmentId: EstablishmentEntity['id'], createSheepDto: CreateSheepDto) {
-    const sheep = this.sheepRepository.create(createSheepDto);
+    const sheep = await this.sheepRepository.save(this.sheepRepository.create(createSheepDto));
+    if (createSheepDto.collarId) {
+      await this.sheepCollarService.assign({ sheepId: sheep.id, collarId: createSheepDto.collarId });
+    }
 
-    //const paddock = await this.paddocksService.findOne(createSheepDto.paddockId);
-
-    //console.log(sheep);
-    //if (paddock.establishmentId !== establishmentId)
-    //  throw new UnauthorizedException('El paddock no pertenece al establecimiento');
-
-    return this.sheepRepository.save(sheep);
+    return sheep;
   }
 
   async findByIdOrFail(id: string, relations: ('paddock' | 'collar')[] = []) {

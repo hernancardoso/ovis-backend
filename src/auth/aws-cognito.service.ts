@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   AuthenticationDetails,
+  CognitoRefreshToken,
   CognitoUser,
   CognitoUserAttribute,
   CognitoUserPool,
@@ -13,6 +14,7 @@ import { CognitoConfig, IConfigService } from 'src/config/interfaces/config.inte
 import { ChangePasswordUserDto } from './dtos/change-password-user.dto';
 import { ForgotPasswordUserDto } from './dtos/forgot-password-user.dto';
 import { ConfirmPasswordUserDto } from './dtos/confirm-password-user.dto';
+import { RefreshTokenUserDto } from './dtos/refresh-token-user.dto';
 
 @Injectable()
 export class AwsCognitoService {
@@ -157,6 +159,30 @@ export class AwsCognitoService {
         onFailure: (err) => {
           reject(err);
         },
+      });
+    });
+  }
+
+  async refreshToken(refreshTokenUserDto: RefreshTokenUserDto) {
+    const RefreshToken = new CognitoRefreshToken({ RefreshToken: refreshTokenUserDto.refreshToken });
+    const userData = {
+      Username: '', // Username should be fetched differently as it's not included in the refresh token
+      Pool: this.userPool,
+    };
+
+    const userCognito = new CognitoUser(userData);
+
+    return new Promise((resolve, reject) => {
+      userCognito.refreshSession(RefreshToken, (err, session) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        resolve({
+          idToken: session.getIdToken().getJwtToken(),
+          accessToken: session.getAccessToken().getJwtToken(),
+          refreshToken: session.getRefreshToken().getToken(),
+        });
       });
     });
   }

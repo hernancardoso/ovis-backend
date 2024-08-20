@@ -6,9 +6,10 @@ import { SheepEntity } from './entities/sheep.entity';
 import { EstablishmentsService } from 'src/establishments/establishments.service';
 import { EstablishmentsModule } from 'src/establishments/establishments.module';
 import { PaddocksModule } from 'src/paddocks/paddocks.module';
+import { SheepCollarModule } from 'src/sheep-collar/sheep-collar.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([SheepEntity]), forwardRef(() => PaddocksModule)],
+  imports: [TypeOrmModule.forFeature([SheepEntity]), forwardRef(() => PaddocksModule), forwardRef(() => SheepCollarModule)],
   controllers: [SheepController],
   providers: [SheepService],
   exports: [SheepService],
