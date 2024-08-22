@@ -14,6 +14,7 @@ import { SheepService } from 'src/sheep/sheep.service';
 import { CollarsService } from 'src/collars/collars.service';
 import { PaddocksService } from 'src/paddocks/paddocks.service';
 import { Collar } from 'src/collars/models/collar.model';
+import { EitherOr } from 'src/commons/types/EitherOr.type';
 
 @Injectable()
 export class SheepCollarService {
@@ -26,7 +27,7 @@ export class SheepCollarService {
     private paddocksService: PaddocksService
   ) {}
 
-  async findActiveAssociationsOf(collarId: string, sheepId: string) {
+  private async findActiveAssociations(collarId: string, sheepId: string) {
     const associations = await this.sheepCollarRepository.find({
       relations: ['collar', 'sheep'],
       take: 2,
@@ -45,21 +46,20 @@ export class SheepCollarService {
 
   async assign(assignCollarToSheepDto: AssignCollarToSheepDto) {
     const { collarId, sheepId } = assignCollarToSheepDto;
+
+    const { collar: collarFound, sheep: sheepFound } = await this.findActiveAssociations(collarId, sheepId);
+    if (collarFound) throw new Error(`The collar ${collarFound.id} - (${collarFound.name}) is already in use`);
+    if (sheepFound) throw new Error(`The collar ${sheepFound.id} - (${sheepFound.name}) is already in use`);
+
+    // const [collar, sheep] = await Promise.all([
+    //   this.collarService.findByIdOrFail(collarId),
+    //   this.sheepService.findByIdOrFail(sheepId, ['paddock']),
+    // ]);
+
+    // if (collar.establishmentId !== sheep.paddock.establishmentId)
+    //   throw new Error('Collar and sheep are not in the same establishment');
+
     const assignedFrom = assignCollarToSheepDto.assignedFrom ?? new Date();
-
-    const { collar: associatedCollar, sheep: associatedSheep } = await this.findActiveAssociationsOf(collarId, sheepId);
-
-    if (associatedCollar) throw new Error(`The collar ${associatedCollar.id} - (${associatedCollar.name}) is already in use`);
-    if (associatedSheep) throw new Error(`The collar ${associatedSheep.id} - (${associatedSheep.name}) is already in use`);
-
-    const [collar, sheep] = await Promise.all([
-      this.collarService.findByIdOrFail(collarId),
-      this.sheepService.findByIdOrFail(sheepId, ['paddock']),
-    ]);
-
-    if (collar.establishmentId !== sheep.paddock.establishmentId)
-      throw new Error('Collar and sheep are not in the same establishment');
-
     const association = this.sheepCollarRepository.create({ collarId, sheepId, assignedFrom });
     try {
       return await this.sheepCollarRepository.save(association);

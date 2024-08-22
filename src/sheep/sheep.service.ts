@@ -20,12 +20,19 @@ export class SheepService {
   ) {}
 
   async create(establishmentId: EstablishmentEntity['id'], createSheepDto: CreateSheepDto) {
-    const sheep = await this.sheepRepository.save(this.sheepRepository.create(createSheepDto));
-    if (createSheepDto.collarId) {
-      await this.sheepCollarService.assign({ sheepId: sheep.id, collarId: createSheepDto.collarId });
+    try {
+      const sheep = await this.sheepRepository.save(this.sheepRepository.create(createSheepDto));
+      if (createSheepDto.collarId) {
+        try {
+          await this.sheepCollarService.assign({ sheepId: sheep.id, collarId: createSheepDto.collarId });
+        } catch (e) {
+          console.log('El collar seleccionado no está disponible');
+        }
+      }
+      return sheep;
+    } catch (e) {
+      throw new Error('Error al crear la oveja, intente nuevamente - collarId o paddockId incorrectos');
     }
-
-    return sheep;
   }
 
   async findByIdOrFail(id: string, relations: ('paddock' | 'collar')[] = []) {
