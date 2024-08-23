@@ -6,6 +6,7 @@ import { PaddockEntity } from './entities/paddock.entity';
 import { Repository, FindOptionsRelations } from 'typeorm';
 import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
 import { SheepService } from 'src/sheep/sheep.service';
+import { EitherOr } from 'src/commons/types/EitherOr.type';
 
 @Injectable()
 export class PaddocksService {
@@ -35,6 +36,11 @@ export class PaddocksService {
 
   async findAll(establishmentId: EstablishmentEntity['id']) {
     return this.paddockRepository.find({ where: { establishmentId } });
+  }
+
+  async getSheepFrom({ establishmentId, paddockId }: EitherOr<{ establishmentId: string }, { paddockId: string }>) {
+    const paddocks = await this.paddockRepository.find({ where: [{ establishmentId }, { id: paddockId }], relations: ['sheep'] });
+    return paddocks.flatMap((paddock) => paddock.sheep);
   }
 
   async findOne(id: string) {

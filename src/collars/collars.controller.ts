@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { CollarsService } from './collars.service';
 import { CreateCollarDto } from './dto/create-collar.dto';
 import { UpdateCollarDto } from './dto/update-collar.dto';
 import { z } from 'zod';
 import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
 import { User } from 'src/commons/decorators/user.decorator';
+import { CollarFilterDto } from './dto/collar-filter.dto';
 
 @Controller('collars')
 export class CollarsController {
@@ -16,13 +17,9 @@ export class CollarsController {
   }
 
   @Get()
-  findAll(@User('establishmentId') establishmentId: EstablishmentEntity['id']) {
-    return this.collarsService.findAll(establishmentId);
-  }
-
-  @Get('unassigned')
-  findAllUnassigned(@User('establishmentId') establishmentId: EstablishmentEntity['id']) {
-    return this.collarsService.findAllUnassigned(establishmentId);
+  findAll(@User('establishmentId') establishmentId: EstablishmentEntity['id'], @Query() filter?: CollarFilterDto) {
+    console.log('Tendria ', filter);
+    return this.collarsService.findAll(establishmentId, filter);
   }
 
   @Get(':id')

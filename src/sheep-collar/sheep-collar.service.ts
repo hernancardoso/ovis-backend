@@ -27,6 +27,13 @@ export class SheepCollarService {
     private paddocksService: PaddocksService
   ) {}
 
+  isAssociated({ collarId, sheepId }: EitherOr<{ collarId: string }, { sheepId: string }>) {
+    return this.sheepCollarRepository.findOne({
+      where: [{ collarId }, { sheepId }],
+      order: { id: 'DESC' },
+    });
+  }
+
   private async findActiveAssociations(collarId: string, sheepId: string) {
     const associations = await this.sheepCollarRepository.find({
       relations: ['collar', 'sheep'],
@@ -51,18 +58,14 @@ export class SheepCollarService {
     if (collarFound) throw new Error(`The collar ${collarFound.id} - (${collarFound.name}) is already in use`);
     if (sheepFound) throw new Error(`The collar ${sheepFound.id} - (${sheepFound.name}) is already in use`);
 
-    // const [collar, sheep] = await Promise.all([
-    //   this.collarService.findByIdOrFail(collarId),
-    //   this.sheepService.findByIdOrFail(sheepId, ['paddock']),
-    // ]);
-
     // if (collar.establishmentId !== sheep.paddock.establishmentId)
     //   throw new Error('Collar and sheep are not in the same establishment');
 
     const assignedFrom = assignCollarToSheepDto.assignedFrom ?? new Date();
-    const association = this.sheepCollarRepository.create({ collarId, sheepId, assignedFrom });
+    const associationEntity = this.sheepCollarRepository.create({ collarId, sheepId, assignedFrom });
     try {
-      return await this.sheepCollarRepository.save(association);
+      const association = await this.sheepCollarRepository.save(associationEntity);
+      await this.collarService.update(collarId, { sheepId }); // theres no need to update sheep bc its done automatically
     } catch (e) {
       Logger.error(e, 'SHEEP-COLLAR');
     }

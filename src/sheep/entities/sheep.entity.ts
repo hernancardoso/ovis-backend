@@ -1,9 +1,10 @@
 import { BreedsEntity } from 'src/breeds/entities/breed.entity';
+import { CollarEntity } from 'src/collars/entities/collar.entity';
 import { TimestampedEntity } from 'src/commons/entities/timestamped.entity';
 import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
 import { PaddockEntity } from 'src/paddocks/entities/paddock.entity';
 import { SheepCollarEntity } from 'src/sheep-collar/entities/sheep-collar.entity';
-import { PrimaryGeneratedColumn, Column, OneToMany, Entity, ManyToOne, JoinColumn } from 'typeorm';
+import { PrimaryGeneratedColumn, Column, OneToOne, OneToMany, Entity, ManyToOne, JoinColumn } from 'typeorm';
 
 @Entity({ name: 'sheep' })
 export class SheepEntity extends TimestampedEntity {
@@ -34,5 +35,12 @@ export class SheepEntity extends TimestampedEntity {
   paddockId: PaddockEntity['id'];
 
   @OneToMany(() => SheepCollarEntity, (sheepCollar) => sheepCollar.collar)
-  collars: SheepCollarEntity[];
+  sheep_history: SheepCollarEntity[];
+
+  @OneToOne(() => CollarEntity, (collar) => collar.sheep)
+  @JoinColumn({ name: 'collarId' })
+  collar: CollarEntity;
+
+  @Column({ nullable: true })
+  collarId: CollarEntity['id']; // Foreign key to CollarEntity
 }

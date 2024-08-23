@@ -8,6 +8,8 @@ import { EstablishmentsService } from 'src/establishments/establishments.service
 import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
 import { SheepCollarEntity } from 'src/sheep-collar/entities/sheep-collar.entity';
 import { SheepCollarService } from 'src/sheep-collar/sheep-collar.service';
+import { CollarFilterDto } from './dto/collar-filter.dto';
+import { AssignationStatus } from 'src/commons/enums/AssignationStatus.enum';
 
 @Injectable()
 export class CollarsService {
@@ -30,25 +32,25 @@ export class CollarsService {
 
   async update(id: string, updateCollarDto: UpdateCollarDto) {
     const collar = await this.findByIdOrFail(id);
-    collar.name = updateCollarDto.name ?? collar.name;
-
-    return await this.collarRepository.save(collar);
+    const updatedCollar = this.collarRepository.merge(collar, updateCollarDto);
+    return this.collarRepository.save(updatedCollar);
   }
 
-  findAll(establishmentId: EstablishmentEntity['id']) {
-    //TODO
-    return this.collarRepository.findBy({ establishmentId });
-  }
+  async findAll(establishmentId: EstablishmentEntity['id'], filter?: CollarFilterDto) {
+    const collars = await this.collarRepository.findBy({ establishmentId });
+    console.log('bueno', filter);
+    if (filter?.status) {
+      console.log('searching with filters');
+      return collars.filter((collar) => {
+        const isAssociated = Boolean(collar.sheepId);
+        return (
+          (filter.status === AssignationStatus.ASSIGNED && isAssociated) ||
+          (filter.status !== AssignationStatus.ASSIGNED && !isAssociated)
+        );
+      });
+    }
 
-  async findAllUnassigned(establishmentId: EstablishmentEntity['id']) {
-    const collars = await this.collarRepository.find({ where: { establishmentId }, relations: ['sheep'] });
-    // Sort the sheep collar association to get the first result, this should be the last association (0 position is the last insertion)
-    // If both assignedFrom and assignedUntil values are filled OR no entry was found then the collar is unassigned
-    collars.forEach((collar) =>
-      collar.sheep.sort((sheep_collar_assoc1, sheep_collar_assoc2) => sheep_collar_assoc2.id - sheep_collar_assoc1.id)
-    );
-
-    return collars.filter((collar) => collar.sheep.length === 0 || collar.sheep[0].assignedUntil);
+    return collars;
   }
 
   async findOne(id: string) {
@@ -58,7 +60,7 @@ export class CollarsService {
       //   relations: ['establishment'],
       //   disableMixedMap: true,
       // },
-      relations: ['establishment'],
+      relations: ['sheep'],
     });
   }
 

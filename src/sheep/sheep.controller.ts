@@ -1,9 +1,10 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { SheepService } from './sheep.service';
 import { CreateSheepDto } from './dto/create-sheep.dto';
 import { UpdateSheepDto } from './dto/update-sheep.dto';
 import { User } from 'src/commons/decorators/user.decorator';
 import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
+import { SheepFilterDto } from './dto/filter-sheep-dto';
 
 @Controller('sheep')
 export class SheepController {
@@ -15,9 +16,8 @@ export class SheepController {
   }
 
   @Get()
-  findAll(@User('establishmentId') establishmentId: EstablishmentEntity['id']) {
-    console.log('listing sheep');
-    return this.sheepService.findAll(establishmentId);
+  findAll(@User('establishmentId') establishmentId: EstablishmentEntity['id'], @Query() filter?: SheepFilterDto) {
+    return this.sheepService.findAll(establishmentId, filter);
   }
 
   @Get(':id')

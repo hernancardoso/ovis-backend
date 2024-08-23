@@ -7,6 +7,8 @@ import { Repository } from 'typeorm';
 import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
 import { PaddocksService } from 'src/paddocks/paddocks.service';
 import { SheepCollarService } from 'src/sheep-collar/sheep-collar.service';
+import { SheepFilterDto } from './dto/filter-sheep-dto';
+import { AssignationStatus } from 'src/commons/enums/AssignationStatus.enum';
 
 @Injectable()
 export class SheepService {
@@ -40,8 +42,21 @@ export class SheepService {
     return await this.sheepRepository.findOneOrFail({ where: { id: id ?? '' }, relations });
   }
 
-  async findAll(establishmentId: EstablishmentEntity['id']) {
-    return (await this.paddocksService.findAll(establishmentId)).flatMap((paddock) => paddock.sheep).filter(Boolean);
+  async findAll(establishmentId: EstablishmentEntity['id'], filter?: SheepFilterDto) {
+    const sheep = await this.paddocksService.getSheepFrom({ establishmentId });
+
+    if (filter?.status) {
+      console.log('searching with filters');
+      return sheep.filter((sheep) => {
+        const isAssociated = Boolean(sheep.collarId);
+        return (
+          (filter.status === AssignationStatus.ASSIGNED && isAssociated) ||
+          (filter.status !== AssignationStatus.ASSIGNED && !isAssociated)
+        );
+      });
+    }
+
+    return sheep;
   }
 
   async findByIds(ids: string[]): Promise<SheepEntity[]> {
@@ -59,6 +74,7 @@ export class SheepService {
     if (sheep.paddock.establishmentId !== establishmentId) {
       throw new UnauthorizedException('La oveja no pertenece al establecimiento');
     }
+
     const updatedSheep = this.sheepRepository.merge(sheep, updateSheepDto);
     try {
       return await this.sheepRepository.save(updatedSheep);
