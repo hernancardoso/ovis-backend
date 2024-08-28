@@ -6,6 +6,7 @@ import { establishmentSchema } from 'src/establishments/schemas/establishment.sc
 export const collarBaseSchema = z.object({
   id: z.string().uuid(),
   name: z.string().max(255),
+  isActive: z.boolean(),
   establishmentId: z.string().uuid().optional(),
 });
 

@@ -1,4 +1,4 @@
-import { forwardRef, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { CreateSheepDto } from './dto/create-sheep.dto';
 import { UpdateSheepDto } from './dto/update-sheep.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -23,6 +23,7 @@ export class SheepService {
 
   async create(establishmentId: EstablishmentEntity['id'], createSheepDto: CreateSheepDto) {
     try {
+      Logger.debug('intentando con ', createSheepDto);
       const sheep = await this.sheepRepository.save(this.sheepRepository.create(createSheepDto));
       if (createSheepDto.collarId) {
         try {
@@ -33,7 +34,41 @@ export class SheepService {
       }
       return sheep;
     } catch (e) {
+      Logger.error(e);
       throw new Error('Error al crear la oveja, intente nuevamente - collarId o paddockId incorrectos');
+    }
+  }
+
+  async update(establishmentId: EstablishmentEntity['id'], id: string, updateSheepDto: UpdateSheepDto) {
+    try {
+      const sheep = await this.findByIdOrFail(id, ['paddock']);
+
+      if (sheep.collarId !== updateSheepDto.collarId) {
+        //change in collarId
+        if (sheep.collarId) {
+          console.log('Bueno, hubo cambio');
+          await this.sheepCollarService.unassign({ collarId: sheep.collarId, sheepId: sheep.id });
+        }
+        if (updateSheepDto.collarId) {
+          console.log('guarde el cambio');
+          await this.sheepCollarService.assign({ collarId: updateSheepDto.collarId, sheepId: sheep.id });
+        }
+      }
+
+      const updatedSheep = this.sheepRepository.merge(sheep, updateSheepDto);
+
+      return await this.sheepRepository.save(updatedSheep);
+    } catch (e) {
+      Logger.debug(e);
+      throw new Error('Error al actualizar la oveja');
+    }
+  }
+
+  async updateCollar(sheepId: string, collarId: string | null) {
+    const sheep = await this.sheepRepository.findOneBy({ id: sheepId });
+    if (sheep) {
+      sheep.collarId = collarId;
+      return this.sheepRepository.save(sheep);
     }
   }
 
@@ -67,20 +102,6 @@ export class SheepService {
 
   async findOne(id: SheepEntity['id']) {
     return this.sheepRepository.findOneByOrFail({ id });
-  }
-
-  async update(establishmentId: EstablishmentEntity['id'], id: string, updateSheepDto: UpdateSheepDto) {
-    const sheep = await this.findByIdOrFail(id, ['paddock']);
-    if (sheep.paddock.establishmentId !== establishmentId) {
-      throw new UnauthorizedException('La oveja no pertenece al establecimiento');
-    }
-
-    const updatedSheep = this.sheepRepository.merge(sheep, updateSheepDto);
-    try {
-      return await this.sheepRepository.save(updatedSheep);
-    } catch (e) {
-      throw new Error('Error al actualizar la oveja');
-    }
   }
 
   remove(id: number) {

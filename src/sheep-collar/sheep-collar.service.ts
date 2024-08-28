@@ -64,8 +64,10 @@ export class SheepCollarService {
     const assignedFrom = assignCollarToSheepDto.assignedFrom ?? new Date();
     const associationEntity = this.sheepCollarRepository.create({ collarId, sheepId, assignedFrom });
     try {
-      const association = await this.sheepCollarRepository.save(associationEntity);
-      await this.collarService.update(collarId, { sheepId }); // theres no need to update sheep bc its done automatically
+      await this.sheepCollarRepository.save(associationEntity);
+
+      await this.collarService.updateSheep(collarId, sheepId);
+      await this.sheepService.updateCollar(sheepId, collarId);
     } catch (e) {
       Logger.error(e, 'SHEEP-COLLAR');
     }
@@ -79,6 +81,9 @@ export class SheepCollarService {
     });
     if (!association) throw new NotFoundException('Association not found');
     association.assignedUntil = new Date();
+    await this.collarService.updateSheep(collarId, null);
+    await this.sheepService.updateCollar(sheepId, null);
+
     return this.sheepCollarRepository.save(association);
   }
 

@@ -53,6 +53,14 @@ export class CollarsService {
     return collars;
   }
 
+  async updateSheep(collarId: string, sheepId: string | null) {
+    const collar = await this.collarRepository.findOneBy({ id: collarId });
+    if (collar) {
+      collar.sheepId = sheepId;
+      return this.collarRepository.save(collar);
+    }
+  }
+
   async findOne(id: string) {
     return this.collarRepository.findOne({
       where: { id },

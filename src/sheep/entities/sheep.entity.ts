@@ -42,5 +42,5 @@ export class SheepEntity extends TimestampedEntity {
   collar: CollarEntity;
 
   @Column({ nullable: true })
-  collarId: CollarEntity['id']; // Foreign key to CollarEntity
+  collarId: CollarEntity['id'] | null; // Foreign key to CollarEntity
 }

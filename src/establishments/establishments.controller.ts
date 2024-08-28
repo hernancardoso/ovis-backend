@@ -31,6 +31,11 @@ export class EstablishmentsController {
     return this.establishmentsService.findAll();
   }
 
+  @Get()
+  find(@User('establishmentId') establishmentId: IUser['establishmentId']) {
+    return this.establishmentsService.findByIdOrFail(establishmentId, ['breeds']);
+  }
+
   @Get(':id')
   findOne(
     @Param('id') establishmentId: EstablishmentEntity['id'],

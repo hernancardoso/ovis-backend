@@ -12,6 +12,9 @@ export class CollarEntity extends TimestampedEntity {
   @Column()
   name: string;
 
+  @Column({ default: true })
+  isActive: boolean;
+
   @ManyToOne(() => EstablishmentEntity, (establishment) => establishment.collars)
   @JoinColumn({ name: 'establishmentId' })
   establishment: EstablishmentEntity;
@@ -27,5 +30,5 @@ export class CollarEntity extends TimestampedEntity {
   sheep: SheepEntity;
 
   @Column({ nullable: true })
-  sheepId: SheepEntity['id']; // Foreign key to SheepEntity
+  sheepId: SheepEntity['id'] | null; // Foreign key to SheepEntity
 }
