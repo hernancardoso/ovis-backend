@@ -44,7 +44,7 @@ export class PaddocksService {
   }
 
   async findOne(id: string) {
-    return this.paddockRepository.findOneByOrFail({ id });
+    return this.paddockRepository.findOneOrFail({ where: { id }, relations: ['sheep'] });
   }
 
   async update(id: PaddockEntity['id'], updatePaddockDto: UpdatePaddockDto) {
