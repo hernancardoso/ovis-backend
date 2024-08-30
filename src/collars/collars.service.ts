@@ -10,15 +10,20 @@ import { SheepCollarEntity } from 'src/sheep-collar/entities/sheep-collar.entity
 import { SheepCollarService } from 'src/sheep-collar/sheep-collar.service';
 import { CollarFilterDto } from './dto/collar-filter.dto';
 import { AssignationStatus } from 'src/commons/enums/AssignationStatus.enum';
+import { BaseService } from 'src/commons/services/base.service';
+import { CollarDto } from './dto/collar.dto';
+import { NotFoundError } from 'rxjs';
 
 @Injectable()
-export class CollarsService {
+export class CollarsService extends BaseService {
   constructor(
     @InjectRepository(CollarEntity)
     private collarRepository: Repository<CollarEntity>,
     @Inject(forwardRef(() => SheepCollarService))
     private sheepCollarService: SheepCollarService
-  ) {}
+  ) {
+    super();
+  }
 
   async create(establishmentId: EstablishmentEntity['id'], createCollarDto: CreateCollarDto) {
     const { sheepId, ...collarData } = createCollarDto;
@@ -65,12 +70,16 @@ export class CollarsService {
   }
 
   async findAll(establishmentId: EstablishmentEntity['id'], filter?: CollarFilterDto) {
-    const collars = await this.collarRepository.findBy({ establishmentId });
-    console.log('bueno', filter);
+    const collars = await this.collarRepository.find({ where: { establishmentId }, relations: ['sheep'] });
+    const collarsDtos = collars.map((collar) =>
+      this.toDto(CollarDto, collar, {
+        sheep: collar.sheep ? { id: collar.sheep.id, name: collar.sheep.name } : null,
+      })
+    );
+
     if (filter?.status) {
-      console.log('searching with filters');
-      return collars.filter((collar) => {
-        const isAssociated = Boolean(collar.sheepId);
+      return collarsDtos.filter((collar) => {
+        const isAssociated = Boolean(collar.sheep?.id);
         return (
           (filter.status === AssignationStatus.ASSIGNED && isAssociated) ||
           (filter.status !== AssignationStatus.ASSIGNED && !isAssociated)
@@ -78,11 +87,11 @@ export class CollarsService {
       });
     }
 
-    return collars;
+    return collarsDtos;
   }
 
   async findOne(id: string) {
-    return this.collarRepository.findOne({
+    const collar = await this.collarRepository.findOne({
       where: { id },
       // loadRelationIds: {
       //   relations: ['establishment'],
@@ -90,6 +99,12 @@ export class CollarsService {
       // },
       relations: ['sheep'],
     });
+    console.log('El collar es', collar);
+    if (!collar) throw new Error('Collar not found');
+
+    const collarDto = this.toDto(CollarDto, collar);
+    console.log('El DTO es ', collarDto);
+    return collarDto;
   }
 
   remove(id: number) {

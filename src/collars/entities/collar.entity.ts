@@ -1,3 +1,4 @@
+import { Expose } from 'class-transformer';
 import { TimestampedEntity } from 'src/commons/entities/timestamped.entity';
 import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
 import { SheepCollarEntity } from 'src/sheep-collar/entities/sheep-collar.entity';
