@@ -21,14 +21,14 @@ export class PaddocksService {
     const paddock = this.paddockRepository.create(createPaddockDto);
     paddock.establishmentId = establishmentId;
 
-    if (createPaddockDto.sheepIds && createPaddockDto.sheepIds.length > 0) {
-      try {
-        const sheep = await this.sheepService.findByIds(createPaddockDto.sheepIds);
-        paddock.sheep = sheep;
-      } catch (e) {
-        throw new Error('Error al buscar las ovejas');
-      }
-    }
+    //if (createPaddockDto.sheepIds && createPaddockDto.sheepIds.length > 0) {
+    // try {
+    //   const sheep = await this.sheepService.findByIds(createPaddockDto.sheepIds);
+    //   paddock.sheep = sheep;
+    // } catch (e) {
+    //   throw new Error('Error al buscar las ovejas');
+    // }
+    //}
     // paddock.sheep = await this.sheepService.findByIds(createPaddockDto.sheepIds);
 
     return await this.paddockRepository.save(paddock);
@@ -49,13 +49,15 @@ export class PaddocksService {
 
   async update(id: PaddockEntity['id'], updatePaddockDto: UpdatePaddockDto) {
     const paddock = await this.paddockRepository.findOneByOrFail({ id });
-    if (updatePaddockDto.sheepIds && updatePaddockDto.sheepIds.length > 0) {
-      try {
-        paddock.sheep = await this.sheepService.findByIds(updatePaddockDto.sheepIds);
-      } catch (e) {
-        throw new Error('Error al buscar las ovejas');
-      }
-    }
+    if (paddock && updatePaddockDto.name) paddock.name = updatePaddockDto.name;
+    return await this.paddockRepository.save(paddock);
+    // if (updatePaddockDto.sheepIds && updatePaddockDto.sheepIds.length > 0) {
+    //   try {
+    //     paddock.sheep = await this.sheepService.findByIds(updatePaddockDto.sheepIds);
+    //   } catch (e) {
+    //     throw new Error('Error al buscar las ovejas');
+    //   }
+    // }
   }
 
   remove(id: number) {

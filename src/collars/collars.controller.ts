@@ -28,8 +28,12 @@ export class CollarsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateCollarDto: UpdateCollarDto) {
-    return this.collarsService.update(id, updateCollarDto);
+  update(
+    @User('establishmentId') establishmentId: EstablishmentEntity['id'],
+    @Param('id') id: string,
+    @Body() updateCollarDto: UpdateCollarDto
+  ) {
+    return this.collarsService.update(establishmentId, id, updateCollarDto);
   }
 
   @Delete(':id')

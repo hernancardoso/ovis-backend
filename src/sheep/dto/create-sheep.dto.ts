@@ -1,20 +1,29 @@
+import { IsString, IsDate, IsOptional, IsUUID, IsNumber } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { PaddockEntity } from 'src/paddocks/entities/paddock.entity';
 import { BreedsEntity } from 'src/breeds/entities/breed.entity';
 import { CollarEntity } from 'src/collars/entities/collar.entity';
-import { PaddockEntity } from 'src/paddocks/entities/paddock.entity';
 
 export class CreateSheepDto {
+  @IsString()
   name: string;
 
+  @IsString()
   birth: Date;
 
-  @Transform(({ value }) => (value === '' ? undefined : value))
+  @IsOptional()
+  @Transform(({ value }) => (value === '' ? null : value))
   breedId: BreedsEntity['id'];
 
+  @IsUUID()
   paddockId: PaddockEntity['id'];
 
-  @Transform(({ value }) => (value === '' ? undefined : value))
+  @IsOptional()
+  @IsUUID()
+  @Transform(({ value }) => (value === '' ? null : value))
   collarId: CollarEntity['id'];
 
+  @IsOptional()
+  @IsString({ each: true })
   tags: string[];
 }

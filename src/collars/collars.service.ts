@@ -1,4 +1,4 @@
-import { Inject, Injectable, forwardRef } from '@nestjs/common';
+import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { CreateCollarDto } from './dto/create-collar.dto';
 import { UpdateCollarDto } from './dto/update-collar.dto';
 import { CollarEntity } from './entities/collar.entity';
@@ -30,10 +30,38 @@ export class CollarsService {
     return savedCollar;
   }
 
-  async update(id: string, updateCollarDto: UpdateCollarDto) {
-    const collar = await this.findByIdOrFail(id);
-    const updatedCollar = this.collarRepository.merge(collar, updateCollarDto);
-    return this.collarRepository.save(updatedCollar);
+  async update(establishmentId: EstablishmentEntity['id'], id: string, updateCollarDto: UpdateCollarDto) {
+    try {
+      const collar = await this.findByIdOrFail(id);
+
+      if (collar.sheepId !== updateCollarDto.sheepId) {
+        //change in collarId
+        if (collar.sheepId) {
+          console.log('Bueno, hubo cambio aa');
+          await this.sheepCollarService.unassign({ collarId: collar.id, sheepId: collar.sheepId });
+        }
+        if (updateCollarDto.sheepId) {
+          console.log('guarde el cambio aa');
+          await this.sheepCollarService.assign({ collarId: collar.id, sheepId: updateCollarDto.sheepId });
+        }
+      }
+
+      const updatedCollar = this.collarRepository.merge(collar, updateCollarDto);
+      console.log('SHEEEP Merging ', collar, ' with ', updateCollarDto, ' to get ', updatedCollar);
+
+      return await this.collarRepository.save(updatedCollar);
+    } catch (e) {
+      Logger.debug(e);
+      throw new Error('Error al actualizar la oveja');
+    }
+  }
+
+  async updateSheep(collarId: string, sheepId: string | null) {
+    const collar = await this.collarRepository.findOneBy({ id: collarId });
+    if (collar) {
+      collar.sheepId = sheepId;
+      return this.collarRepository.save(collar);
+    }
   }
 
   async findAll(establishmentId: EstablishmentEntity['id'], filter?: CollarFilterDto) {
@@ -51,14 +79,6 @@ export class CollarsService {
     }
 
     return collars;
-  }
-
-  async updateSheep(collarId: string, sheepId: string | null) {
-    const collar = await this.collarRepository.findOneBy({ id: collarId });
-    if (collar) {
-      collar.sheepId = sheepId;
-      return this.collarRepository.save(collar);
-    }
   }
 
   async findOne(id: string) {

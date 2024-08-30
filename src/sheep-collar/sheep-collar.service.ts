@@ -87,23 +87,7 @@ export class SheepCollarService {
     return this.sheepCollarRepository.save(association);
   }
 
-  create(createSheepCollarDto: CreateSheepCollarDto) {
-    return 'This action adds a new sheepCollar';
-  }
-
-  findAll() {
-    return `This action returns all sheepCollar`;
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} sheepCollar`;
-  }
-
-  update(id: number, updateSheepCollarDto: UpdateSheepCollarDto) {
-    return `This action updates a #${id} sheepCollar`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} sheepCollar`;
+  findAll(id: string) {
+    return this.sheepCollarRepository.find({ where: [{ collarId: id }, { sheepId: id }], order: { id: 'DESC' } });
   }
 }

@@ -41,7 +41,7 @@ export class SheepService {
 
   async update(establishmentId: EstablishmentEntity['id'], id: string, updateSheepDto: UpdateSheepDto) {
     try {
-      const sheep = await this.findByIdOrFail(id, ['paddock']);
+      const sheep = await this.findByIdOrFail(id);
 
       if (sheep.collarId !== updateSheepDto.collarId) {
         //change in collarId
@@ -56,6 +56,7 @@ export class SheepService {
       }
 
       const updatedSheep = this.sheepRepository.merge(sheep, updateSheepDto);
+      console.log('Merging ', sheep, ' with ', updateSheepDto, ' to get ', updatedSheep);
 
       return await this.sheepRepository.save(updatedSheep);
     } catch (e) {
@@ -66,8 +67,10 @@ export class SheepService {
 
   async updateCollar(sheepId: string, collarId: string | null) {
     const sheep = await this.sheepRepository.findOneBy({ id: sheepId });
+    console.log('La encontre, ', sheep);
     if (sheep) {
       sheep.collarId = collarId;
+      console.log('Quedo , ', sheep);
       return this.sheepRepository.save(sheep);
     }
   }
