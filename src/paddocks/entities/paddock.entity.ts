@@ -13,7 +13,7 @@ export class PaddockEntity extends TimestampedEntity {
   name: string;
 
   @OneToMany(() => SheepEntity, (sheep) => sheep.paddock)
-  sheep: SheepEntity[];
+  sheep: SheepEntity[] | null;
 
   @ManyToOne(() => EstablishmentEntity, (establishment) => establishment.paddocks)
   @JoinColumn({ name: 'establishmentId' })

@@ -15,9 +15,11 @@ import { CollarsService } from 'src/collars/collars.service';
 import { PaddocksService } from 'src/paddocks/paddocks.service';
 import { Collar } from 'src/collars/models/collar.model';
 import { EitherOr } from 'src/commons/types/EitherOr.type';
+import { BaseService } from 'src/commons/services/base.service';
+import { SheepCollarDto } from './dto/sheep-collar.dto';
 
 @Injectable()
-export class SheepCollarService {
+export class SheepCollarService extends BaseService {
   constructor(
     @InjectRepository(SheepCollarEntity)
     private sheepCollarRepository: Repository<SheepCollarEntity>,
@@ -25,7 +27,9 @@ export class SheepCollarService {
     private collarService: CollarsService,
     private sheepService: SheepService,
     private paddocksService: PaddocksService
-  ) {}
+  ) {
+    super();
+  }
 
   isAssociated({ collarId, sheepId }: EitherOr<{ collarId: string }, { sheepId: string }>) {
     return this.sheepCollarRepository.findOne({
@@ -87,7 +91,18 @@ export class SheepCollarService {
     return this.sheepCollarRepository.save(association);
   }
 
-  findAll(id: string) {
-    return this.sheepCollarRepository.find({ where: [{ collarId: id }, { sheepId: id }], order: { id: 'DESC' } });
+  async findAll(id: string) {
+    const associations = await this.sheepCollarRepository.find({
+      where: [{ collarId: id }, { sheepId: id }],
+      order: { id: 'DESC' },
+      relations: ['collar', 'sheep'],
+    });
+
+    return associations.map((association) =>
+      this.toDto(SheepCollarDto, association, {
+        collar: { id: association.collar.id, name: association.collar.name },
+        sheep: { id: association.sheep.id, name: association.sheep.name },
+      })
+    );
   }
 }

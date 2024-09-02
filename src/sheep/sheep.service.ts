@@ -3,15 +3,19 @@ import { CreateSheepDto } from './dto/create-sheep.dto';
 import { UpdateSheepDto } from './dto/update-sheep.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { SheepEntity } from './entities/sheep.entity';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
 import { PaddocksService } from 'src/paddocks/paddocks.service';
 import { SheepCollarService } from 'src/sheep-collar/sheep-collar.service';
 import { SheepFilterDto } from './dto/filter-sheep-dto';
 import { AssignationStatus } from 'src/commons/enums/AssignationStatus.enum';
+import { SheepDto } from './dto/sheep.dto';
+import { BaseService } from 'src/commons/services/base.service';
+import { PaddockEntity } from 'src/paddocks/entities/paddock.entity';
+import { CollarEntity } from 'src/collars/entities/collar.entity';
 
 @Injectable()
-export class SheepService {
+export class SheepService extends BaseService {
   constructor(
     @InjectRepository(SheepEntity)
     private sheepRepository: Repository<SheepEntity>,
@@ -19,7 +23,9 @@ export class SheepService {
     private paddocksService: PaddocksService,
     @Inject(forwardRef(() => SheepCollarService))
     private sheepCollarService: SheepCollarService
-  ) {}
+  ) {
+    super();
+  }
 
   async create(establishmentId: EstablishmentEntity['id'], createSheepDto: CreateSheepDto) {
     try {
@@ -80,13 +86,22 @@ export class SheepService {
     return await this.sheepRepository.findOneOrFail({ where: { id: id ?? '' }, relations });
   }
 
+  private toSheepDto(sheep: SheepEntity) {
+    return this.toDto(SheepDto, sheep, {
+      collar: sheep.collar ? { id: sheep.collar.id, name: sheep.collar.name } : undefined,
+      paddock: sheep.paddock ? { id: sheep.paddock.id, name: sheep.paddock.name } : undefined,
+      breed: sheep.breed ? { id: sheep.breed.id.toString(), name: sheep.breed.name } : undefined,
+    });
+  }
+
   async findAll(establishmentId: EstablishmentEntity['id'], filter?: SheepFilterDto) {
-    const sheep = await this.paddocksService.getSheepFrom({ establishmentId });
+    const sheepIds = await this.paddocksService.getSheepIdsFrom({ establishmentId });
+
+    const sheep = (await this.findByIds(sheepIds, ['paddock', 'collar'])).map((sheep) => this.toSheepDto(sheep));
 
     if (filter?.status) {
-      console.log('searching with filters');
       return sheep.filter((sheep) => {
-        const isAssociated = Boolean(sheep.collarId);
+        const isAssociated = Boolean(sheep.collar?.id);
         return (
           (filter.status === AssignationStatus.ASSIGNED && isAssociated) ||
           (filter.status !== AssignationStatus.ASSIGNED && !isAssociated)
@@ -97,20 +112,22 @@ export class SheepService {
     return sheep;
   }
 
-  async findByIds(ids: string[]): Promise<SheepEntity[]> {
-    console.log('llegue');
-
-    return this.sheepRepository.findBy({ id: In(ids) });
+  async findByIds(ids: string[], relations?: string[]): Promise<SheepEntity[]> {
+    return await this.sheepRepository.find({ where: { id: In(ids) }, relations });
   }
 
   async findOne(id: SheepEntity['id']) {
-    return this.sheepRepository.findOneByOrFail({ id });
+    const sheep = await this.sheepRepository.findOne({
+      where: { id },
+      relations: ['collar', 'paddock', 'breed'],
+    });
+
+    if (!sheep) throw new Error('Collar not found');
+
+    return this.toSheepDto(sheep);
   }
 
   remove(id: number) {
     return `This action removes a #${id} sheep`;
   }
-}
-function In(ids: string[]): string | import('typeorm').FindOperator<string> | undefined {
-  throw new Error('Function not implemented.');
 }

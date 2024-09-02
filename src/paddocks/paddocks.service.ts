@@ -43,6 +43,16 @@ export class PaddocksService {
     return paddocks.flatMap((paddock) => paddock.sheep);
   }
 
+  async getSheepIdsFrom({ establishmentId, paddockId }: EitherOr<{ establishmentId: string }, { paddockId: string }>) {
+    const paddocks = await this.paddockRepository.find({
+      where: [{ establishmentId }, { id: paddockId }],
+      loadRelationIds: { relations: ['sheep'] },
+    });
+    const sheepIds = paddocks.flatMap((paddock) => paddock.sheep) as unknown as string[];
+
+    return sheepIds;
+  }
+
   async findOne(id: string) {
     return this.paddockRepository.findOneOrFail({ where: { id }, relations: ['sheep'] });
   }

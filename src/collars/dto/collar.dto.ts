@@ -12,5 +12,5 @@ export class CollarDto {
   isActive: boolean;
 
   @Expose()
-  sheep: SheepReducedDto | null;
+  sheep: SheepReducedDto | null | undefined;
 }
