@@ -4,6 +4,8 @@ import { EstablishmentEntity } from 'src/establishments/entities/establishment.e
 import { SheepCollarEntity } from 'src/sheep-collar/entities/sheep-collar.entity';
 import { SheepEntity } from 'src/sheep/entities/sheep.entity';
 import { Column, Entity, PrimaryGeneratedColumn, OneToOne, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import { LatestLocation } from '../interfaces/latest-location.interface';
+import { LatestStatus } from '../interfaces/latest-status.interface';
 
 @Entity({ name: 'collars' })
 export class CollarEntity extends TimestampedEntity {
@@ -15,6 +17,12 @@ export class CollarEntity extends TimestampedEntity {
 
   @Column({ default: true })
   isActive: boolean;
+
+  @Column({ nullable: true, type: 'json' })
+  latestLocation: LatestLocation;
+
+  @Column({ nullable: true, type: 'json' })
+  latestStatus: LatestStatus;
 
   @ManyToOne(() => EstablishmentEntity, (establishment) => establishment.collars)
   @JoinColumn({ name: 'establishmentId' })

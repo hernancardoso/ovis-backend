@@ -18,7 +18,6 @@ export class CollarsController {
 
   @Get()
   findAll(@User('establishmentId') establishmentId: EstablishmentEntity['id'], @Query() filter?: CollarFilterDto) {
-    console.log('Tendria ', filter);
     return this.collarsService.findAll(establishmentId, filter);
   }
 
