@@ -8,6 +8,9 @@ export class CollarDto {
   id: string;
 
   @Expose()
+  imei: number;
+
+  @Expose()
   name: string;
 
   @Expose()

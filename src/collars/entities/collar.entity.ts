@@ -6,11 +6,15 @@ import { SheepEntity } from 'src/sheep/entities/sheep.entity';
 import { Column, Entity, PrimaryGeneratedColumn, OneToOne, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { LatestLocation } from '../interfaces/latest-location.interface';
 import { LatestStatus } from '../interfaces/latest-status.interface';
+import { type } from 'os';
 
 @Entity({ name: 'collars' })
 export class CollarEntity extends TimestampedEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ nullable: false, type: 'numeric', default: 33 })
+  imei: number;
 
   @Column()
   name: string;
