@@ -71,14 +71,14 @@ export class CollarsService extends BaseService {
 
   private toCollarDto(collar: CollarEntity) {
     return this.toDto(CollarDto, collar, {
-      sheep: collar.sheep ? { id: collar.sheep.id, name: collar.sheep.name } : null,
+      sheep: collar.sheep ? { id: collar.sheep.id, name: collar.sheep.name, tags: collar.sheep.tags } : null,
     });
   }
 
   async findAll(establishmentId: EstablishmentEntity['id'], filter?: CollarFilterDto) {
     const collars = await this.collarRepository.find({ where: { establishmentId }, relations: ['sheep'] });
     const collarsDtos = collars.map((collar) => this.toCollarDto(collar));
-
+    console.log(collarsDtos);
     if (filter?.status) {
       return collarsDtos.filter((collar) => {
         const isAssociated = Boolean(collar.sheep?.id);

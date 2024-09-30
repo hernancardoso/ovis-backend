@@ -13,7 +13,7 @@ export class CollarEntity extends TimestampedEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ nullable: false, type: 'numeric', default: 33 })
+  @Column({ nullable: false, type: 'bigint', default: 33 })
   imei: number;
 
   @Column()

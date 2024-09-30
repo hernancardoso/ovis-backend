@@ -25,7 +25,7 @@ export class SheepEntity extends TimestampedEntity {
   breedId: BreedsEntity['id'];
 
   @Column({ type: 'simple-array', nullable: true })
-  tags: string[];
+  tags: string[] | null;
 
   @ManyToOne(() => PaddockEntity, (paddock) => paddock.sheep)
   @JoinColumn({ name: 'paddockId' })
