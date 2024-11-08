@@ -15,6 +15,7 @@ import { TypeOrmConfigService } from './datasource/typeorm-config.service';
 import { SheepCollarModule } from './sheep-collar/sheep-collar.module';
 import { PaddocksModule } from './paddocks/paddocks.module';
 import { BreedsModule } from './breeds/breeds.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { BreedsModule } from './breeds/breeds.module';
     SheepCollarModule,
     PaddocksModule,
     BreedsModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
