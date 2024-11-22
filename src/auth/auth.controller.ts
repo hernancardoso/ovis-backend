@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UsePipes, ValidationPipe } from '@nestjs/common';
+import { Body, Controller, Post, BadRequestException } from '@nestjs/common';
 import { AwsCognitoService } from './aws-cognito.service';
 import { RegisterUserDto } from './dtos/register-user.dto';
 import { LoginUserDto } from './dtos/login-user.dto';
@@ -20,7 +20,8 @@ export class AuthController {
 
   @Post('/login')
   async login(@Body() authLoginUserDto: LoginUserDto) {
-    return this.awsCognitoService.authenticateUser(authLoginUserDto);
+    const authResult = await this.awsCognitoService.authenticateUser(authLoginUserDto);
+    return authResult;
   }
 
   @Post('/change-password')
