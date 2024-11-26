@@ -8,7 +8,9 @@ export class CreateSheepDto {
   @IsString()
   name: string;
 
+  @IsOptional()
   @IsString()
+  @Transform(({ value }) => (value === '' ? null : value))
   birth: Date;
 
   @IsOptional()

@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Put, UseGuards, UnauthorizedException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Put,
+  UseGuards,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { EstablishmentsService } from './establishments.service';
 import { CreateEstablishmentDto } from './dto/create-establishment.dto';
 import { UpdateEstablishmentDto } from './dto/update-establishment.dto';
@@ -17,7 +28,10 @@ export class EstablishmentsController {
   }
 
   @Put(':id/breeds')
-  updateBreeds(@Param('id') establishmentId: EstablishmentEntity['id'], @Body() updateBreedsDto: UpdateBreedsDto) {
+  updateBreeds(
+    @Param('id') establishmentId: EstablishmentEntity['id'],
+    @Body() updateBreedsDto: UpdateBreedsDto
+  ) {
     return this.establishmentsService.updateBreeds(establishmentId, updateBreedsDto);
   }
 
@@ -43,7 +57,11 @@ export class EstablishmentsController {
   ) {
     if (establishmentId !== establishmentRequestId) throw new UnauthorizedException("Can't access");
 
-    return this.establishmentsService.findByIdOrFail(establishmentId, ['breeds', 'paddocks', 'collars']);
+    return this.establishmentsService.findByIdOrFail(establishmentId, [
+      'breeds',
+      'paddocks',
+      'collars',
+    ]);
   }
 
   @Get(':id/collars')

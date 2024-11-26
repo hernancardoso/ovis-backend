@@ -29,11 +29,13 @@ export class SheepService extends BaseService {
 
   async create(establishmentId: EstablishmentEntity['id'], createSheepDto: CreateSheepDto) {
     try {
-      Logger.debug('intentando con ', createSheepDto);
       const sheep = await this.sheepRepository.save(this.sheepRepository.create(createSheepDto));
       if (createSheepDto.collarId) {
         try {
-          await this.sheepCollarService.assign({ sheepId: sheep.id, collarId: createSheepDto.collarId });
+          await this.sheepCollarService.assign({
+            sheepId: sheep.id,
+            collarId: createSheepDto.collarId,
+          });
         } catch (e) {
           console.log('El collar seleccionado no está disponible');
         }
@@ -41,11 +43,17 @@ export class SheepService extends BaseService {
       return sheep;
     } catch (e) {
       Logger.error(e);
-      throw new Error('Error al crear la oveja, intente nuevamente - collarId o paddockId incorrectos');
+      throw new Error(
+        'Error al crear la oveja, intente nuevamente - collarId o paddockId incorrectos'
+      );
     }
   }
 
-  async update(establishmentId: EstablishmentEntity['id'], id: string, updateSheepDto: UpdateSheepDto) {
+  async update(
+    establishmentId: EstablishmentEntity['id'],
+    id: string,
+    updateSheepDto: UpdateSheepDto
+  ) {
     try {
       const sheep = await this.findByIdOrFail(id);
 
@@ -57,7 +65,10 @@ export class SheepService extends BaseService {
         }
         if (updateSheepDto.collarId) {
           console.log('guarde el cambio');
-          await this.sheepCollarService.assign({ collarId: updateSheepDto.collarId, sheepId: sheep.id });
+          await this.sheepCollarService.assign({
+            collarId: updateSheepDto.collarId,
+            sheepId: sheep.id,
+          });
         }
       }
 
@@ -97,7 +108,9 @@ export class SheepService extends BaseService {
   async findAll(establishmentId: EstablishmentEntity['id'], filter?: SheepFilterDto) {
     const sheepIds = await this.paddocksService.getSheepIdsFrom({ establishmentId });
 
-    const sheep = (await this.findByIds(sheepIds, ['paddock', 'collar'])).map((sheep) => this.toSheepDto(sheep));
+    const sheep = (await this.findByIds(sheepIds, ['paddock', 'collar'])).map((sheep) =>
+      this.toSheepDto(sheep)
+    );
 
     if (filter?.status) {
       return sheep.filter((sheep) => {
@@ -127,7 +140,11 @@ export class SheepService extends BaseService {
     return this.toSheepDto(sheep);
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} sheep`;
+  async remove(id: SheepEntity['id']) {
+    const result = await this.sheepRepository.softDelete({ id });
+
+    if (!result.affected) throw new Error('No se pudo borrar');
+
+    return true;
   }
 }

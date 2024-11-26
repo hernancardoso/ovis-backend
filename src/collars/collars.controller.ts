@@ -12,12 +12,18 @@ export class CollarsController {
   constructor(private readonly collarsService: CollarsService) {}
 
   @Post()
-  create(@User('establishmentId') establishmentId: EstablishmentEntity['id'], @Body() createCollarDto: CreateCollarDto) {
+  create(
+    @User('establishmentId') establishmentId: EstablishmentEntity['id'],
+    @Body() createCollarDto: CreateCollarDto
+  ) {
     return this.collarsService.create(establishmentId, createCollarDto);
   }
 
   @Get()
-  findAll(@User('establishmentId') establishmentId: EstablishmentEntity['id'], @Query() filter?: CollarFilterDto) {
+  findAll(
+    @User('establishmentId') establishmentId: EstablishmentEntity['id'],
+    @Query() filter?: CollarFilterDto
+  ) {
     return this.collarsService.findAll(establishmentId, filter);
   }
 
@@ -37,6 +43,6 @@ export class CollarsController {
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.collarsService.remove(+id);
+    return this.collarsService.remove(id);
   }
 }

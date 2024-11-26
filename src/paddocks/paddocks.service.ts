@@ -38,12 +38,21 @@ export class PaddocksService {
     return this.paddockRepository.find({ where: { establishmentId } });
   }
 
-  async getSheepFrom({ establishmentId, paddockId }: EitherOr<{ establishmentId: string }, { paddockId: string }>) {
-    const paddocks = await this.paddockRepository.find({ where: [{ establishmentId }, { id: paddockId }], relations: ['sheep'] });
+  async getSheepFrom({
+    establishmentId,
+    paddockId,
+  }: EitherOr<{ establishmentId: string }, { paddockId: string }>) {
+    const paddocks = await this.paddockRepository.find({
+      where: [{ establishmentId }, { id: paddockId }],
+      relations: ['sheep'],
+    });
     return paddocks.flatMap((paddock) => paddock.sheep);
   }
 
-  async getSheepIdsFrom({ establishmentId, paddockId }: EitherOr<{ establishmentId: string }, { paddockId: string }>) {
+  async getSheepIdsFrom({
+    establishmentId,
+    paddockId,
+  }: EitherOr<{ establishmentId: string }, { paddockId: string }>) {
     const paddocks = await this.paddockRepository.find({
       where: [{ establishmentId }, { id: paddockId }],
       loadRelationIds: { relations: ['sheep'] },
@@ -59,18 +68,33 @@ export class PaddocksService {
 
   async update(id: PaddockEntity['id'], updatePaddockDto: UpdatePaddockDto) {
     const paddock = await this.paddockRepository.findOneByOrFail({ id });
-    if (paddock && updatePaddockDto.name) paddock.name = updatePaddockDto.name;
+
+    if (paddock && updatePaddockDto.name) {
+      paddock.name = updatePaddockDto.name;
+    }
+
+    if (updatePaddockDto.sheepIds) {
+      try {
+        paddock.sheep = await this.sheepService.findByIds(updatePaddockDto.sheepIds);
+      } catch (e) {
+        throw new Error('Error al buscar las ovejas');
+      }
+    }
+
     return await this.paddockRepository.save(paddock);
-    // if (updatePaddockDto.sheepIds && updatePaddockDto.sheepIds.length > 0) {
-    //   try {
-    //     paddock.sheep = await this.sheepService.findByIds(updatePaddockDto.sheepIds);
-    //   } catch (e) {
-    //     throw new Error('Error al buscar las ovejas');
-    //   }
-    // }
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} paddock`;
+  async remove(id: string) {
+    const paddock = await this.paddockRepository.findOneOrFail({
+      where: { id },
+      relations: ['sheep'],
+    });
+    if (paddock.sheep && paddock.sheep.length > 0) {
+      throw new Error('No se puede borrar el corral porque tiene ovejas asociadas');
+    }
+
+    const result = await this.paddockRepository.softDelete({ id });
+
+    return Boolean(result.affected);
   }
 }

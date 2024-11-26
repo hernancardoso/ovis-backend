@@ -35,7 +35,11 @@ export class CollarsService extends BaseService {
     return savedCollar;
   }
 
-  async update(establishmentId: EstablishmentEntity['id'], id: string, updateCollarDto: UpdateCollarDto) {
+  async update(
+    establishmentId: EstablishmentEntity['id'],
+    id: string,
+    updateCollarDto: UpdateCollarDto
+  ) {
     try {
       const collar = await this.findByIdOrFail(id);
 
@@ -47,7 +51,10 @@ export class CollarsService extends BaseService {
         }
         if (updateCollarDto.sheepId) {
           console.log('guarde el cambio aa');
-          await this.sheepCollarService.assign({ collarId: collar.id, sheepId: updateCollarDto.sheepId });
+          await this.sheepCollarService.assign({
+            collarId: collar.id,
+            sheepId: updateCollarDto.sheepId,
+          });
         }
       }
 
@@ -71,12 +78,17 @@ export class CollarsService extends BaseService {
 
   private toCollarDto(collar: CollarEntity) {
     return this.toDto(CollarDto, collar, {
-      sheep: collar.sheep ? { id: collar.sheep.id, name: collar.sheep.name, tags: collar.sheep.tags } : null,
+      sheep: collar.sheep
+        ? { id: collar.sheep.id, name: collar.sheep.name, tags: collar.sheep.tags }
+        : null,
     });
   }
 
   async findAll(establishmentId: EstablishmentEntity['id'], filter?: CollarFilterDto) {
-    const collars = await this.collarRepository.find({ where: { establishmentId }, relations: ['sheep'] });
+    const collars = await this.collarRepository.find({
+      where: { establishmentId },
+      relations: ['sheep'],
+    });
     const collarsDtos = collars.map((collar) => this.toCollarDto(collar));
     console.log(collarsDtos);
     if (filter?.status) {
@@ -103,8 +115,12 @@ export class CollarsService extends BaseService {
     return this.toCollarDto(collar);
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} collar`;
+  async remove(id: string) {
+    const result = await this.collarRepository.softDelete({ id });
+
+    if (!result.affected) throw new Error('No se pudo borrar');
+
+    return true;
   }
 
   findById(id: string) {

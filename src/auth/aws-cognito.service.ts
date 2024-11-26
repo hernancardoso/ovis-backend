@@ -13,9 +13,7 @@ import { RegisterUserDto } from './dtos/register-user.dto';
 import { LoginUserDto } from './dtos/login-user.dto';
 import { ChangePasswordUserDto } from './dtos/change-password-user.dto';
 import { ForgotPasswordUserDto } from './dtos/forgot-password-user.dto';
-import { ConfirmPasswordUserDto } from './dtos/confirm-password-user.dto';
 import { RefreshTokenUserDto } from './dtos/refresh-token-user.dto';
-import { ForceChangePasswordUserDto } from './dtos/force-change-password-user.dto';
 
 type AuthResult = {
   idToken: string;
@@ -106,9 +104,7 @@ export class AwsCognitoService {
     });
   }
 
-  async respondToNewPasswordChallenge(
-    forceChangePasswordUserDto: ForceChangePasswordUserDto
-  ): Promise<AuthResult> {
+  async respondToNewPasswordChallenge(forceChangePasswordUserDto: any): Promise<AuthResult> {
     const { email, newPassword, userAttr, session } = forceChangePasswordUserDto;
 
     const userData = {
@@ -193,4 +189,29 @@ export class AwsCognitoService {
     });
   }
 
+  async refreshToken(refreshTokenUserDto: RefreshTokenUserDto) {
+    const RefreshToken = new CognitoRefreshToken({
+      RefreshToken: refreshTokenUserDto.refreshToken,
+    });
+    const userData = {
+      Username: '', // Username should be fetched differently as it's not included in the refresh token
+      Pool: this.userPool,
+    };
+
+    const userCognito = new CognitoUser(userData);
+
+    return new Promise((resolve, reject) => {
+      userCognito.refreshSession(RefreshToken, (err, session) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        resolve({
+          idToken: session.getIdToken().getJwtToken(),
+          accessToken: session.getAccessToken().getJwtToken(),
+          refreshToken: session.getRefreshToken().getToken(),
+        });
+      });
+    });
+  }
 }

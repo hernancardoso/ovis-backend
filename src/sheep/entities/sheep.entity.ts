@@ -4,7 +4,15 @@ import { TimestampedEntity } from 'src/commons/entities/timestamped.entity';
 import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
 import { PaddockEntity } from 'src/paddocks/entities/paddock.entity';
 import { SheepCollarEntity } from 'src/sheep-collar/entities/sheep-collar.entity';
-import { PrimaryGeneratedColumn, Column, OneToOne, OneToMany, Entity, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  PrimaryGeneratedColumn,
+  Column,
+  OneToOne,
+  OneToMany,
+  Entity,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 
 @Entity({ name: 'sheep' })
 export class SheepEntity extends TimestampedEntity {

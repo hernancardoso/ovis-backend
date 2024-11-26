@@ -11,12 +11,18 @@ export class SheepController {
   constructor(private readonly sheepService: SheepService) {}
 
   @Post()
-  create(@User('establishmentId') establishmentId: EstablishmentEntity['id'], @Body() createSheepDto: CreateSheepDto) {
+  create(
+    @User('establishmentId') establishmentId: EstablishmentEntity['id'],
+    @Body() createSheepDto: CreateSheepDto
+  ) {
     return this.sheepService.create(establishmentId, createSheepDto);
   }
 
   @Get()
-  findAll(@User('establishmentId') establishmentId: EstablishmentEntity['id'], @Query() filter?: SheepFilterDto) {
+  findAll(
+    @User('establishmentId') establishmentId: EstablishmentEntity['id'],
+    @Query() filter?: SheepFilterDto
+  ) {
     return this.sheepService.findAll(establishmentId, filter);
   }
 
@@ -36,6 +42,6 @@ export class SheepController {
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.sheepService.remove(+id);
+    return this.sheepService.remove(id);
   }
 }

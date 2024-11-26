@@ -34,11 +34,6 @@ export class AuthController {
     return await this.awsCognitoService.forgotUserPassword(authForgotPasswordUserDto);
   }
 
-  @Post('/confirm-password')
-  async confirmPassword(@Body() authConfirmPasswordUserDto: ConfirmPasswordUserDto) {
-    return await this.awsCognitoService.confirmUserPassword(authConfirmPasswordUserDto);
-  }
-
   @Post('/refresh-token')
   async refreshToken(@Body() refreshTokenUserDto: RefreshTokenUserDto) {
     return await this.awsCognitoService.refreshToken(refreshTokenUserDto);

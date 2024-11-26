@@ -29,7 +29,8 @@ export class EstablishmentsService {
     if (createEstablishmentDto?.collarIds?.length) {
       const collars = await this.collarService.findByIds(createEstablishmentDto.collarIds);
 
-      if (collars.length !== createEstablishmentDto.collarIds.length) throw new Error('One or more collar IDs are invalid');
+      if (collars.length !== createEstablishmentDto.collarIds.length)
+        throw new Error('One or more collar IDs are invalid');
 
       establishment.collars = collars;
     }
@@ -40,24 +41,31 @@ export class EstablishmentsService {
   async update(id: string, updateEstablishmentDto: UpdateEstablishmentDto) {
     const establishment = await this.findById(id);
     establishment.name = updateEstablishmentDto.name ?? establishment.name; //if updateEstablishmentDto.name is empty use the last name saved
+    establishment.tags = updateEstablishmentDto.tags ?? [];
+    // if (updateEstablishmentDto.collarIds?.length) {
+    //   const newCollars = await this.collarService.findByIds(updateEstablishmentDto.collarIds);
+    //   if (newCollars.length !== updateEstablishmentDto.collarIds.length)
+    //     throw new Error('One or more collar IDs are invalid');
 
-    if (updateEstablishmentDto.collarIds?.length) {
-      const newCollars = await this.collarService.findByIds(updateEstablishmentDto.collarIds);
-      if (newCollars.length !== updateEstablishmentDto.collarIds.length) throw new Error('One or more collar IDs are invalid');
-
-      establishment.collars = newCollars;
-    }
+    //   establishment.collars = newCollars;
+    // }
 
     return this.establishmentRepository.save(establishment);
   }
 
   async listBreeds(id: EstablishmentEntity['id']): Promise<BreedsEntity[] | []> {
-    const establishment = await this.establishmentRepository.findOne({ where: { id }, relations: ['breeds'] });
+    const establishment = await this.establishmentRepository.findOne({
+      where: { id },
+      relations: ['breeds'],
+    });
     return establishment?.breeds ?? [];
   }
 
   async updateBreeds(id: EstablishmentEntity['id'], updateBreedsDto: UpdateBreedsDto) {
-    const establishment = await this.establishmentRepository.findOneOrFail({ where: { id }, relations: ['breeds'] });
+    const establishment = await this.establishmentRepository.findOneOrFail({
+      where: { id },
+      relations: ['breeds'],
+    });
     const breeds = await this.breedsService.find(updateBreedsDto.breedsIds);
 
     establishment.breeds = breeds;
@@ -65,7 +73,10 @@ export class EstablishmentsService {
     return this.establishmentRepository.save(establishment);
   }
 
-  async findByIdOrFail(id: string, relations?: (keyof FindOptionsRelations<EstablishmentEntity>)[]) {
+  async findByIdOrFail(
+    id: string,
+    relations?: (keyof FindOptionsRelations<EstablishmentEntity>)[]
+  ) {
     if (!id) throw new Error('La id del collar no puede ser vacía');
     return await this.establishmentRepository.findOneOrFail({ where: { id: id ?? '' }, relations });
   }

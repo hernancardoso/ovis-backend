@@ -11,7 +11,10 @@ export class PaddocksController {
   constructor(private readonly paddocksService: PaddocksService) {}
 
   @Post()
-  create(@User('establishmentId') establishmentId: EstablishmentEntity['id'], @Body() createPaddockDto: CreatePaddockDto) {
+  create(
+    @User('establishmentId') establishmentId: EstablishmentEntity['id'],
+    @Body() createPaddockDto: CreatePaddockDto
+  ) {
     return this.paddocksService.create(establishmentId, createPaddockDto);
   }
 
@@ -32,6 +35,6 @@ export class PaddocksController {
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.paddocksService.remove(+id);
+    return this.paddocksService.remove(id);
   }
 }
