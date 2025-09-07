@@ -11,24 +11,8 @@ global['fetch'] = require('node-fetch');
 bootstrap();
 
 async function bootstrapApp() {
-  const isDev = process.env.NODE_ENV === 'development';
-  let app;
-
-  if (!isDev) {
-    // HTTPS options for production
-    const httpsOptions = {
-      key: fs.readFileSync('/etc/ssl/certs/backend.ovisfing.tech.key'),
-      cert: fs.readFileSync('/etc/ssl/certs/backend_ovisfing_tech.crt'),
-      ca: fs.readFileSync('/etc/ssl/certs/backend_ovisfing_tech.ca-bundle'),
-    };
-
-    app = await NestFactory.create(AppModule, { httpsOptions });
-    console.log('Starting in HTTPS mode...');
-  } else {
-    // HTTP for development
-    app = await NestFactory.create(AppModule);
-    console.log('Starting in HTTP mode...');
-  }
+  const app = await NestFactory.create(AppModule);
+  console.log('Starting in HTTP mode...');
 
   const reflector = app.get(Reflector);
 
@@ -42,9 +26,9 @@ async function bootstrapApp() {
     methods: '*',
   });
 
-  const port = isDev ? 3000 : 443;
+  const port = 3000;
   await app.listen(port, () => {
-    console.log(`Application is running on ${isDev ? 'http' : 'https'}://localhost:${port}`);
+    console.log(`Application is running locahost port ${port}`);
   });
 }
 
