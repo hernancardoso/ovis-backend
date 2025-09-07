@@ -1,64 +1,126 @@
-import { Inject, Injectable, forwardRef } from '@nestjs/common';
+import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { CreateCollarDto } from './dto/create-collar.dto';
 import { UpdateCollarDto } from './dto/update-collar.dto';
 import { CollarEntity } from './entities/collar.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { EstablishmentsService } from 'src/establishments/establishments.service';
+import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
+import { SheepCollarEntity } from 'src/sheep-collar/entities/sheep-collar.entity';
+import { SheepCollarService } from 'src/sheep-collar/sheep-collar.service';
+import { CollarFilterDto } from './dto/collar-filter.dto';
+import { AssignationStatus } from 'src/commons/enums/AssignationStatus.enum';
+import { BaseService } from 'src/commons/services/base.service';
+import { CollarDto } from './dto/collar.dto';
+import { NotFoundError } from 'rxjs';
 
 @Injectable()
-export class CollarsService {
+export class CollarsService extends BaseService {
   constructor(
     @InjectRepository(CollarEntity)
     private collarRepository: Repository<CollarEntity>,
-
-    @Inject(forwardRef(() => EstablishmentsService))
-    private establishmentService: EstablishmentsService
-  ) {}
-
-  async create(createCollarDto: CreateCollarDto) {
-    const collar = this.collarRepository.create(createCollarDto);
-
-    const establishment = await this.establishmentService.findById(
-      createCollarDto.establishmentId
-    );
-    collar.establishment = establishment;
-
-    return this.collarRepository.save(collar);
+    @Inject(forwardRef(() => SheepCollarService))
+    private sheepCollarService: SheepCollarService
+  ) {
+    super();
   }
 
-  async update(id: string, updateCollarDto: UpdateCollarDto) {
-    const collar = await this.findByIdOrFail(id);
-    collar.name = updateCollarDto.name ?? collar.name;
+  async create(establishmentId: EstablishmentEntity['id'], createCollarDto: CreateCollarDto) {
+    const { sheepId, ...collarData } = createCollarDto;
+    const collar = this.collarRepository.create(collarData);
+    collar.establishmentId = establishmentId;
 
-    if (
-      updateCollarDto.establishmentId &&
-      collar.establishment.id !== updateCollarDto.establishmentId
-    )
-      collar.establishment = await this.establishmentService.findById(
-        updateCollarDto.establishmentId
-      );
-
-    return this.collarRepository.save(collar);
+    const savedCollar = await this.collarRepository.save(collar);
+    if (sheepId) this.sheepCollarService.assign({ collarId: savedCollar.id, sheepId });
+    return savedCollar;
   }
 
-  findAll() {
-    return `This action returns all collars`;
+  async update(
+    establishmentId: EstablishmentEntity['id'],
+    id: string,
+    updateCollarDto: UpdateCollarDto
+  ) {
+    try {
+      const collar = await this.findByIdOrFail(id);
+
+      if (collar.sheepId !== updateCollarDto.sheepId) {
+        //change in collarId
+        if (collar.sheepId) {
+          console.log('Bueno, hubo cambio aa');
+          await this.sheepCollarService.unassign({ collarId: collar.id, sheepId: collar.sheepId });
+        }
+        if (updateCollarDto.sheepId) {
+          console.log('guarde el cambio aa');
+          await this.sheepCollarService.assign({
+            collarId: collar.id,
+            sheepId: updateCollarDto.sheepId,
+          });
+        }
+      }
+
+      const updatedCollar = this.collarRepository.merge(collar, updateCollarDto);
+      console.log('SHEEEP Merging ', collar, ' with ', updateCollarDto, ' to get ', updatedCollar);
+
+      return await this.collarRepository.save(updatedCollar);
+    } catch (e) {
+      Logger.debug(e);
+      throw new Error('Error al actualizar la oveja');
+    }
   }
 
-  async findOne(id: string) {
-    return this.collarRepository.findOne({
-      where: { id },
-      // loadRelationIds: {
-      //   relations: ['establishment'],
-      //   disableMixedMap: true,
-      // },
-      relations: ['establishment'],
+  async updateSheep(collarId: string, sheepId: string | null) {
+    const collar = await this.collarRepository.findOneBy({ id: collarId });
+    if (collar) {
+      collar.sheepId = sheepId;
+      return this.collarRepository.save(collar);
+    }
+  }
+
+  private toCollarDto(collar: CollarEntity) {
+    return this.toDto(CollarDto, collar, {
+      sheep: collar.sheep
+        ? { id: collar.sheep.id, name: collar.sheep.name, tags: collar.sheep.tags }
+        : null,
     });
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} collar`;
+  async findAll(establishmentId: EstablishmentEntity['id'], filter?: CollarFilterDto) {
+    const collars = await this.collarRepository.find({
+      where: { establishmentId },
+      relations: ['sheep'],
+    });
+    const collarsDtos = collars.map((collar) => this.toCollarDto(collar));
+    console.log(collarsDtos);
+    if (filter?.status) {
+      return collarsDtos.filter((collar) => {
+        const isAssociated = Boolean(collar.sheep?.id);
+        return (
+          (filter.status === AssignationStatus.ASSIGNED && isAssociated) ||
+          (filter.status !== AssignationStatus.ASSIGNED && !isAssociated)
+        );
+      });
+    }
+
+    return collarsDtos;
+  }
+
+  async findOne(id: string, relations?: string[]) {
+    const collar = await this.collarRepository.findOne({
+      where: { id },
+      relations: ['sheep'],
+    });
+
+    if (!collar) throw new Error('Collar not found');
+    console.log(this.toCollarDto(collar));
+    return this.toCollarDto(collar);
+  }
+
+  async remove(id: string) {
+    const result = await this.collarRepository.softDelete({ id });
+
+    if (!result.affected) throw new Error('No se pudo borrar');
+
+    return true;
   }
 
   findById(id: string) {

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const sheepSchema = z.object({
-  id: z.number().int().positive(),
+  id: z.string().uuid(),
   name: z.string(),
   //age: z.number().int().nonnegative(),
 });

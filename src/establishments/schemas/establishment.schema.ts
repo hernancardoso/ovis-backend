@@ -1,9 +1,10 @@
-import { collarSchema } from 'src/collars/schema/collar.schema';
+import { collarSchema } from 'src/collars/schemas/collar.schema';
 import { z } from 'zod';
 
 export const establishmentSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
+  collars: z.array(collarSchema).optional(), // Include collars if necessary
 });
 
 const establishmentIdsType = z.object({

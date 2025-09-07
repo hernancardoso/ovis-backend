@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const authConfigSchema = z.object({
+export const cognitoConfigSchema = z.object({
   userPoolId: z.string(),
   clientId: z.string(),
   region: z.string(),
@@ -18,6 +18,6 @@ export const typeOrmConfigSchema = z.object({
 });
 
 export const configServiceSchema = z.object({
-  auth: authConfigSchema,
+  cognito: cognitoConfigSchema,
   typeorm: typeOrmConfigSchema,
 });

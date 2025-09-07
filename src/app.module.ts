@@ -9,15 +9,19 @@ import { TypeOrmConfigModule } from './datasource/typeorm-config.module';
 import { SheepModule } from './sheep/sheep.module';
 import { AuthModule } from './auth/auth.module';
 import databaseConfig from './config/typeorm.config';
-import authConfig from './config/auth.config';
+import cognitoConfig from './config/cognito.config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TypeOrmConfigService } from './datasource/typeorm-config.service';
+import { SheepCollarModule } from './sheep-collar/sheep-collar.module';
+import { PaddocksModule } from './paddocks/paddocks.module';
+import { BreedsModule } from './breeds/breeds.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [databaseConfig, authConfig],
+      load: [databaseConfig, cognitoConfig],
       envFilePath: ['.env.development.local'],
     }),
     TypeOrmModule.forRootAsync({ useClass: TypeOrmConfigService }),
@@ -25,6 +29,10 @@ import { TypeOrmConfigService } from './datasource/typeorm-config.service';
     EstablishmentsModule,
     SheepModule,
     AuthModule,
+    SheepCollarModule,
+    PaddocksModule,
+    BreedsModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,10 +1,13 @@
 // collar.schema.ts
 import { z } from 'zod';
 import { sheepSchema } from 'src/sheep/schema/sheep.schema';
+import { establishmentSchema } from 'src/establishments/schemas/establishment.schema';
 
 export const collarBaseSchema = z.object({
-  id: z.number().int().positive(),
+  id: z.string().uuid(),
   name: z.string().max(255),
+  isActive: z.boolean(),
+  establishmentId: z.string().uuid().optional(),
 });
 
 export const collarWithSheepSchema = collarBaseSchema.extend({

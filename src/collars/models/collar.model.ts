@@ -1,6 +1,5 @@
 import { CollarEntity } from '../entities/collar.entity';
-import { collarBaseSchema } from '../schema/collar.schema';
-import { ToDto } from 'src/commons/decorators/to-dto.decorator';
+import { CollarDto } from '../dto/collar.dto';
+import { collarBaseSchema } from '../schemas/collar.schema';
 
-@ToDto(collarBaseSchema)
-export class Collar extends CollarEntity {}
+export class Collar {}

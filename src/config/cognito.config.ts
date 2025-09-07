@@ -1,12 +1,12 @@
 import { exit } from 'process';
-import { IAuthConfig } from './interfaces/config.interface';
-import { authConfigSchema } from './schemas/config.schema';
+import { CognitoConfig } from './interfaces/config.interface';
+import { cognitoConfigSchema } from './schemas/config.schema';
 import { Logger } from '@nestjs/common';
 
-export default (): { auth: IAuthConfig } => {
+export default (): { cognito: CognitoConfig } => {
   try {
     return {
-      auth: authConfigSchema.parse({
+      cognito: cognitoConfigSchema.parse({
         userPoolId: process.env.COGNITO_USER_POOL_ID,
         clientId: process.env.COGNITO_CLIENT_ID,
         region: process.env.COGNITO_REGION,
