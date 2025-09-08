@@ -13,7 +13,14 @@ jobs:
 
     - name: Install dependencies
       run: npm install
-
+    - name: Test SSH key secret
+      run: |
+        if [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
+          echo "SSH_PRIVATE_KEY is empty!"
+          exit 1
+        else
+          echo "SSH_PRIVATE_KEY is present ✅"
+        fi
     - name: Deploy to AWS EC2
       uses: appleboy/scp-action@master
       with:
