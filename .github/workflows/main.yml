@@ -10,17 +10,22 @@ jobs:
     environment: REMOTE_HOST
 
     steps:
+    # 1️⃣ Checkout the repository
     - uses: actions/checkout@v2
 
+    # 2️⃣ Install dependencies
     - name: Install dependencies
       run: npm install
 
+    # 3️⃣ Build the NestJS project
     - name: Build NestJS project
       run: npm run build
 
+    # 4️⃣ Optional: list files for debugging
     - name: List files after build
-      run: ls -la
-      
+      run: ls -R
+
+    # 5️⃣ Test SSH key secret
     - name: Test SSH key secret
       run: |
         if [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
@@ -30,18 +35,17 @@ jobs:
           echo "SSH_PRIVATE_KEY is present ✅"
         fi
 
+    # 6️⃣ Deploy compiled files
     - name: Deploy compiled files
       uses: appleboy/scp-action@master
       with:
         host: ${{ secrets.REMOTE_HOST }}
         username: ${{ secrets.REMOTE_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
-        source: |
-          dist
-          package.json
-          package-lock.json
+        source: dist,package.json,package-lock.json
         target: "/var/www/ovis-backend"
 
+    # 7️⃣ Install production dependencies & restart PM2
     - name: Restart PM2 application
       uses: appleboy/ssh-action@master
       with:
