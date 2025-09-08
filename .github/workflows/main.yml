@@ -14,6 +14,10 @@ jobs:
 
     - name: Install dependencies
       run: npm install
+
+    - name: Build NestJS project
+      run: npm run build
+
     - name: Test SSH key secret
       run: |
         if [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
@@ -22,13 +26,17 @@ jobs:
         else
           echo "SSH_PRIVATE_KEY is present ✅"
         fi
-    - name: Deploy to AWS EC2
+
+    - name: Deploy compiled files
       uses: appleboy/scp-action@master
       with:
         host: ${{ secrets.REMOTE_HOST }}
         username: ${{ secrets.REMOTE_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
-        source: "./"  # This now correctly points to the current directory
+        source: |
+          dist
+          package.json
+          package-lock.json
         target: "/var/www/ovis-backend"
 
     - name: Restart PM2 application
@@ -39,4 +47,5 @@ jobs:
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
           cd /var/www/ovis-backend
-          pm2 reload all  # This command restarts your application
+          npm install --production
+          pm2 start dist/main.js --name ovis-backend || pm2 reload ovis-backend
