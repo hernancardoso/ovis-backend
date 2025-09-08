@@ -18,6 +18,9 @@ jobs:
     - name: Build NestJS project
       run: npm run build
 
+    - name: List files after build
+      run: ls -la
+      
     - name: Test SSH key secret
       run: |
         if [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
