@@ -9,6 +9,7 @@ import {
   Put,
   UseGuards,
   UnauthorizedException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { EstablishmentsService } from './establishments.service';
 import { CreateEstablishmentDto } from './dto/create-establishment.dto';
@@ -55,7 +56,7 @@ export class EstablishmentsController {
     @Param('id') establishmentId: EstablishmentEntity['id'],
     @User('establishmentId') establishmentRequestId: IUser['establishmentId']
   ) {
-    if (establishmentId !== establishmentRequestId) throw new UnauthorizedException("Can't access");
+    if (establishmentId !== establishmentRequestId) throw new ForbiddenException("Can't access");
 
     return this.establishmentsService.findByIdOrFail(establishmentId, [
       'breeds',

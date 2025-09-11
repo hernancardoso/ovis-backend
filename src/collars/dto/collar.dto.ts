@@ -24,4 +24,10 @@ export class CollarDto {
 
   @Expose()
   sheep: SheepReducedWithTagsDto | null | undefined;
+
+  @Expose()
+  createdAt: Date;
+
+  @Expose()
+  updatedAt: Date;
 }

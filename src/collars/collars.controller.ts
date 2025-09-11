@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
 import { User } from 'src/commons/decorators/user.decorator';
 import { CollarFilterDto } from './dto/collar-filter.dto';
+import { GetInitialFilterDto } from './dto/get-initial-info.dto';
 
 @Controller('collars')
 export class CollarsController {
@@ -25,6 +26,12 @@ export class CollarsController {
     @Query() filter?: CollarFilterDto
   ) {
     return this.collarsService.findAll(establishmentId, filter);
+  }
+
+  @Get(':imei/info')
+  getInitialInfo(@Param('imei') imei: string, @Query() params: GetInitialFilterDto) {
+    const { from, to } = params;
+    return this.collarsService.getInitialInfo(Number(imei), from, to);
   }
 
   @Get(':id')
