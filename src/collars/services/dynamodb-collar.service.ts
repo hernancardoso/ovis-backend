@@ -26,19 +26,23 @@ export class DynamoDBCollarService {
   private readonly collarInitialInfoTableName = 'collar_initial_info';
 
   private parseLatest(item: any) {
-    const parsed = item.latest_json ? JSON.parse(item.latest_json) : null;
-    const ts = parsed?.timestamp;
+    const parsed_status = item.latest_status_json ? JSON.parse(item.latest_status_json) : null;
+    const parsed_location = item.latest_location_json
+      ? JSON.parse(item.latest_location_json)
+      : null;
+
+    const ts = parsed_status?.timestamp;
     return {
       latestLocation:
-        parsed && parsed.lat != null && parsed.long != null && ts != null
-          ? { timestamp: ts, lat: parsed.lat, long: parsed.long }
+        parsed_location && parsed_location.lat != null && parsed_location.long != null && ts != null
+          ? { timestamp: ts, lat: parsed_location.lat, long: parsed_location.long }
           : undefined,
       latestStatus:
-        parsed && ts != null
+        parsed_status && ts != null
           ? {
               timestamp: ts,
-              battery_voltage: parsed.battery_voltage ?? null,
-              rsrp: parsed.rsrp ?? null,
+              battery_voltage: parsed_status.battery_voltage ?? null,
+              rsrp: parsed_status.rsrp ?? null,
             }
           : undefined,
     };
@@ -93,8 +97,8 @@ export class DynamoDBCollarService {
     const resp = await this.doc.send(
       new GetCommand({
         TableName: this.tableName,
-        Key: { imei }, // must be Number to match schema
-        ProjectionExpression: 'imei, latest_json, updatedAt',
+        Key: { imei },
+        ProjectionExpression: 'imei, latest_location_json, latest_status_json',
       })
     );
     if (!resp.Item) return null;
@@ -119,8 +123,8 @@ export class DynamoDBCollarService {
       let request: BatchGetCommandInput = {
         RequestItems: {
           [this.tableName]: {
-            Keys: chunk.map((n) => ({ imei: n })), // all numeric keys
-            ProjectionExpression: 'imei, latest_json, updatedAt',
+            Keys: chunk.map((n) => ({ imei: n })),
+            ProjectionExpression: 'imei, latest_status_json, latest_location_json',
           },
         },
       };
