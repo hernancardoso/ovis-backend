@@ -55,4 +55,6 @@ jobs:
         script: |
           cd /var/www/ovis-backend
           npm install --production
-          pm2 start dist/src/main.js --name ovis-backend || pm2 reload ovis-backend
+          pm2 delete ovis-backend || true
+          pm2 start /var/www/ovis-backend/dist/src/main.js --name ovis-backend
+
