@@ -13,6 +13,7 @@ import { AssignationStatus } from 'src/commons/enums/AssignationStatus.enum';
 import { BaseService } from 'src/commons/services/base.service';
 import { CollarDto } from './dto/collar.dto';
 import { NotFoundError } from 'rxjs';
+import { DynamoDBCollarService } from './services/dynamodb-collar.service';
 
 @Injectable()
 export class CollarsService extends BaseService {
@@ -20,7 +21,8 @@ export class CollarsService extends BaseService {
     @InjectRepository(CollarEntity)
     private collarRepository: Repository<CollarEntity>,
     @Inject(forwardRef(() => SheepCollarService))
-    private sheepCollarService: SheepCollarService
+    private sheepCollarService: SheepCollarService,
+    private dynamoDBCollarService: DynamoDBCollarService
   ) {
     super();
   }
@@ -76,11 +78,16 @@ export class CollarsService extends BaseService {
     }
   }
 
-  private toCollarDto(collar: CollarEntity) {
+  private async toCollarDto(
+    collar: CollarEntity,
+    dynamoData?: { latestLocation?: any; latestStatus?: any }
+  ) {
     return this.toDto(CollarDto, collar, {
       sheep: collar.sheep
         ? { id: collar.sheep.id, name: collar.sheep.name, tags: collar.sheep.tags }
         : null,
+      latestLocation: dynamoData?.latestLocation || null,
+      latestStatus: dynamoData?.latestStatus || null,
     });
   }
 
@@ -89,7 +96,25 @@ export class CollarsService extends BaseService {
       where: { establishmentId },
       relations: ['sheep'],
     });
-    const collarsDtos = collars.map((collar) => this.toCollarDto(collar));
+
+    // Get IMEIs for DynamoDB lookup
+    const imeis = collars.map((collar) => collar.imei);
+
+    // Fetch latest activity data from DynamoDB
+    const dynamoDataMap = await this.dynamoDBCollarService.getMultipleCollarLastActivity(imeis);
+
+    // Create DTOs with DynamoDB data
+    const collarsDtos = await Promise.all(
+      collars.map(async (collar) => {
+        const dynamoData = dynamoDataMap.get(Number(collar.imei));
+
+        return this.toCollarDto(collar, {
+          latestLocation: dynamoData?.latestLocation,
+          latestStatus: dynamoData?.latestStatus,
+        });
+      })
+    );
+
     console.log(collarsDtos);
     if (filter?.status) {
       return collarsDtos.filter((collar) => {
@@ -104,6 +129,10 @@ export class CollarsService extends BaseService {
     return collarsDtos;
   }
 
+  getInitialInfo(imei: number, from: number, to: number) {
+    return this.dynamoDBCollarService.getCollarInitialInfo(imei, from, to);
+  }
+
   async findOne(id: string, relations?: string[]) {
     const collar = await this.collarRepository.findOne({
       where: { id },
@@ -111,8 +140,17 @@ export class CollarsService extends BaseService {
     });
 
     if (!collar) throw new Error('Collar not found');
-    console.log(this.toCollarDto(collar));
-    return this.toCollarDto(collar);
+
+    // Fetch latest activity data from DynamoDB
+    const dynamoData = await this.dynamoDBCollarService.getCollarLastActivity(collar.imei);
+
+    const collarDto = await this.toCollarDto(collar, {
+      latestLocation: dynamoData?.latestLocation,
+      latestStatus: dynamoData?.latestStatus,
+    });
+
+    console.log(collarDto);
+    return collarDto;
   }
 
   async remove(id: string) {
