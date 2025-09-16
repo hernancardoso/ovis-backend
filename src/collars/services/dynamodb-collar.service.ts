@@ -51,7 +51,7 @@ export class DynamoDBCollarService {
   async getCollarInitialInfo(imei: number, limit: number = 10) {
     if (!imei) {
       this.logger.warn(`Invalid IMEI provided: ${imei}`);
-      return null; // still guard invalid input [6]
+      return null;
     }
 
     const params = {
@@ -67,25 +67,32 @@ export class DynamoDBCollarService {
       },
       ProjectionExpression: 'imei, #data, #ts',
       ScanIndexForward: false,
-      Limit: limit,
     };
 
     let items: any[] = [];
-    let lastEvaluatedKey: any | undefined = undefined;
+    let lastEvaluatedKey: any | undefined;
 
     do {
       const resp = await this.doc.send(
         new QueryCommand({
           ...params,
+          Limit: limit - items.length, // only fetch what’s left
           ExclusiveStartKey: lastEvaluatedKey,
         })
       );
-      if (resp.Items?.length) items = items.concat(resp.Items); // paginate to get all [9]
-      lastEvaluatedKey = resp.LastEvaluatedKey; // continue if more pages [9]
+
+      if (resp.Items?.length) {
+        items = items.concat(resp.Items);
+      }
+
+      if (items.length >= limit) {
+        break;
+      }
+
+      lastEvaluatedKey = resp.LastEvaluatedKey;
     } while (lastEvaluatedKey);
 
-    // Optional: map/parse if needed
-    return items;
+    return items.slice(0, limit);
   }
 
   async getCollarLastActivity(imei: number) {

@@ -115,7 +115,6 @@ export class CollarsService extends BaseService {
       })
     );
 
-    console.log(collarsDtos);
     if (filter?.status) {
       return collarsDtos.filter((collar) => {
         const isAssociated = Boolean(collar.sheep?.id);
@@ -149,7 +148,6 @@ export class CollarsService extends BaseService {
       latestStatus: dynamoData?.latestStatus,
     });
 
-    console.log(collarDto);
     return collarDto;
   }
 
