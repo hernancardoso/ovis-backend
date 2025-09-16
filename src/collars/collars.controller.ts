@@ -30,8 +30,8 @@ export class CollarsController {
 
   @Get(':imei/info')
   getInitialInfo(@Param('imei') imei: string, @Query() params: GetInitialFilterDto) {
-    const { from, to } = params;
-    return this.collarsService.getInitialInfo(Number(imei), from, to);
+    const { limit } = params;
+    return this.collarsService.getInitialInfo(Number(imei), limit);
   }
 
   @Get(':id')

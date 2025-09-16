@@ -129,8 +129,8 @@ export class CollarsService extends BaseService {
     return collarsDtos;
   }
 
-  getInitialInfo(imei: number, from: number, to: number) {
-    return this.dynamoDBCollarService.getCollarInitialInfo(imei, from, to);
+  getInitialInfo(imei: number, limit: number) {
+    return this.dynamoDBCollarService.getCollarInitialInfo(imei, limit);
   }
 
   async findOne(id: string, relations?: string[]) {

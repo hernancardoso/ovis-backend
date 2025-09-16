@@ -48,7 +48,7 @@ export class DynamoDBCollarService {
     };
   }
 
-  async getCollarInitialInfo(imei: number, from: number, to: number) {
+  async getCollarInitialInfo(imei: number, limit: number = 10) {
     if (!imei) {
       this.logger.warn(`Invalid IMEI provided: ${imei}`);
       return null; // still guard invalid input [6]
@@ -56,7 +56,7 @@ export class DynamoDBCollarService {
 
     const params = {
       TableName: this.collarInitialInfoTableName,
-      KeyConditionExpression: '#pk = :imei AND #ts BETWEEN :from AND :to',
+      KeyConditionExpression: '#pk = :imei',
       ExpressionAttributeNames: {
         '#pk': 'imei',
         '#data': 'data',
@@ -64,11 +64,10 @@ export class DynamoDBCollarService {
       },
       ExpressionAttributeValues: {
         ':imei': imei,
-        ':from': from,
-        ':to': to,
       },
       ProjectionExpression: 'imei, #data, #ts',
       ScanIndexForward: false,
+      Limit: limit,
     };
 
     let items: any[] = [];
