@@ -43,6 +43,8 @@ export class DynamoDBCollarService {
               timestamp: ts,
               battery_voltage: parsed_status.battery_voltage ?? null,
               rsrp: parsed_status.rsrp ?? null,
+              suse: parsed_status.suse ?? null,
+              stot: parsed_status.stot ?? null,
             }
           : undefined,
     };
