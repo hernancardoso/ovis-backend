@@ -1,4 +1,12 @@
-import { Body, Controller, Post, BadRequestException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Post,
+  BadRequestException,
+  UnauthorizedException,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { AwsCognitoService } from './aws-cognito.service';
 import { RegisterUserDto } from './dtos/register-user.dto';
 import { LoginUserDto } from './dtos/login-user.dto';
@@ -36,6 +44,25 @@ export class AuthController {
 
   @Post('/refresh-token')
   async refreshToken(@Body() refreshTokenUserDto: RefreshTokenUserDto) {
-    return await this.awsCognitoService.refreshToken(refreshTokenUserDto);
+    try {
+      return await this.awsCognitoService.refreshToken(refreshTokenUserDto);
+    } catch (error) {
+      // AWS Cognito errors have a 'name' property
+      const errorName = error?.name || '';
+      const errorMessage = error?.message || '';
+
+      // If refresh token is expired or invalid, return 401
+      if (
+        errorName === 'NotAuthorizedException' ||
+        errorMessage.includes('expired') ||
+        errorMessage.includes('invalid')
+      ) {
+        throw new UnauthorizedException('Refresh token expired or invalid');
+      }
+
+      // For other errors, log and throw a generic error
+      console.error('Refresh token error:', error);
+      throw new HttpException('Failed to refresh token', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 }
