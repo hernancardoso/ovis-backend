@@ -43,38 +43,27 @@ export class CollarsService extends BaseService {
     updateCollarDto: UpdateCollarDto
   ) {
     try {
-      const collar = await this.findByIdOrFail(id);
+      const collar = await this.findOne(id, false) as CollarEntity;
 
-      if (collar.sheepId !== updateCollarDto.sheepId) {
-        //change in collarId
-        if (collar.sheepId) {
-          console.log('Bueno, hubo cambio aa');
-          await this.sheepCollarService.unassign({ collarId: collar.id, sheepId: collar.sheepId });
-        }
-        if (updateCollarDto.sheepId) {
-          console.log('guarde el cambio aa');
-          await this.sheepCollarService.assign({
-            collarId: collar.id,
-            sheepId: updateCollarDto.sheepId,
-          });
-        }
+      console.log("updateCollarDto", updateCollarDto);
+
+      
+      if (updateCollarDto.sheepId !== "" && updateCollarDto.sheepId !== undefined) {
+        console.log("tendria que haber entrado aca?")
+        await this.sheepCollarService.assign({ collarId: id, sheepId: updateCollarDto.sheepId });
+      } else if (collar.sheepId && !updateCollarDto.sheepId) {
+        console.log("tendria que haber entrado aca????")
+        await this.sheepCollarService.unassign({ sheepId: collar.sheepId, collarId: id });
       }
+      const {sheep, ...mergeCollar} = updateCollarDto;
+      const updatedCollar = this.collarRepository.merge(collar, mergeCollar);
+      const savedCollar = await this.collarRepository.save(updatedCollar);
 
-      const updatedCollar = this.collarRepository.merge(collar, updateCollarDto);
-      console.log('SHEEEP Merging ', collar, ' with ', updateCollarDto, ' to get ', updatedCollar);
-
-      return await this.collarRepository.save(updatedCollar);
+      return this.toCollarDto(savedCollar);
+      
     } catch (e) {
       Logger.debug(e);
       throw new Error('Error al actualizar la oveja');
-    }
-  }
-
-  async updateSheep(collarId: string, sheepId: string | null) {
-    const collar = await this.collarRepository.findOneBy({ id: collarId });
-    if (collar) {
-      collar.sheepId = sheepId;
-      return this.collarRepository.save(collar);
     }
   }
 
@@ -92,10 +81,16 @@ export class CollarsService extends BaseService {
   }
 
   async findAll(establishmentId: EstablishmentEntity['id'], filter?: CollarFilterDto) {
-    const collars = await this.collarRepository.find({
-      where: { establishmentId },
-      relations: ['sheep'],
-    });
+    const collars = await this.collarRepository
+      .createQueryBuilder('collar')
+      .where('collar.establishmentId = :establishmentId', { establishmentId })
+      .leftJoin(
+        SheepCollarEntity,
+        'sc',
+        'sc.collarId = collar.id AND sc.assignedUntil IS NULL'
+      )
+      .leftJoinAndMapOne('collar.sheep', 'sheep', 'sheep', 'sheep.id = sc.sheepId')
+      .getMany();
 
     // Get IMEIs for DynamoDB lookup
     const imeis = collars.map((collar) => collar.imei);
@@ -132,13 +127,21 @@ export class CollarsService extends BaseService {
     return this.dynamoDBCollarService.getCollarInitialInfo(imei, limit);
   }
 
-  async findOne(id: string, relations?: string[]) {
-    const collar = await this.collarRepository.findOne({
-      where: { id },
-      relations: ['sheep'],
-    });
+  async findOne(id: string, toDto:boolean = false) {
+    const collar = await this.collarRepository
+      .createQueryBuilder('collar')
+      .where('collar.id = :id', { id })
+      .leftJoin(
+        SheepCollarEntity,
+        'sc',
+        'sc.collarId = collar.id AND sc.assignedUntil IS NULL'
+      )
+      .leftJoinAndMapOne('collar.sheep', 'sheep', 'sheep', 'sheep.id = sc.sheepId')
+      .getOne();
 
     if (!collar) throw new Error('Collar not found');
+
+    
 
     // Fetch latest activity data from DynamoDB
     const dynamoData = await this.dynamoDBCollarService.getCollarLastActivity(collar.imei);
@@ -147,6 +150,7 @@ export class CollarsService extends BaseService {
       latestLocation: dynamoData?.latestLocation,
       latestStatus: dynamoData?.latestStatus,
     });
+    if (!toDto) return collar;
 
     return collarDto;
   }

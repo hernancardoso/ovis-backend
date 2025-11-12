@@ -1,29 +1,30 @@
+import { Entity, Column, PrimaryColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { CollarEntity } from 'src/collars/entities/collar.entity';
 import { SheepEntity } from 'src/sheep/entities/sheep.entity';
-import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm';
 
+@Index('uniq_active_sheep_collar', ['sheepId', 'collarId'], {
+  unique: true,
+  where: 'assignedUntil IS NULL', // enforce one active collar per sheep
+})
 @Entity()
 export class SheepCollarEntity {
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  @Column({ nullable: false })
-  sheepId: SheepEntity['id'];
+  @PrimaryColumn({ type: 'char', length: 36 })
+  sheepId: string;
 
   @ManyToOne(() => SheepEntity, (sheep) => sheep.sheep_history)
   @JoinColumn({ name: 'sheepId' })
   sheep: SheepEntity;
 
-  @Column({ nullable: false })
-  collarId: CollarEntity['id'];
+  @PrimaryColumn({ type: 'char', length: 36 })
+  collarId: string;
 
   @ManyToOne(() => CollarEntity, (collar) => collar.sheep_history)
   @JoinColumn({ name: 'collarId' })
   collar: CollarEntity;
 
-  @Column({ nullable: false })
+  @PrimaryColumn({ type: 'datetime' })
   assignedFrom: Date;
 
-  @Column({ nullable: true })
+  @Column({ type: 'datetime', nullable: true })
   assignedUntil?: Date;
 }

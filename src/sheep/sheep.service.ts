@@ -13,6 +13,7 @@ import { SheepDto } from './dto/sheep.dto';
 import { BaseService } from 'src/commons/services/base.service';
 import { PaddockEntity } from 'src/paddocks/entities/paddock.entity';
 import { CollarEntity } from 'src/collars/entities/collar.entity';
+import { SheepCollarEntity } from 'src/sheep-collar/entities/sheep-collar.entity';
 
 @Injectable()
 export class SheepService extends BaseService {
@@ -55,40 +56,25 @@ export class SheepService extends BaseService {
     updateSheepDto: UpdateSheepDto
   ) {
     try {
-      const sheep = await this.findByIdOrFail(id);
+      const sheep = await this.findOne(id);
 
-      if (sheep.collarId !== updateSheepDto.collarId) {
-        //change in collarId
-        if (sheep.collarId) {
-          console.log('Bueno, hubo cambio');
-          await this.sheepCollarService.unassign({ collarId: sheep.collarId, sheepId: sheep.id });
-        }
-        if (updateSheepDto.collarId) {
-          console.log('guarde el cambio');
-          await this.sheepCollarService.assign({
-            collarId: updateSheepDto.collarId,
-            sheepId: sheep.id,
-          });
-        }
+      if(updateSheepDto.collarId) {
+        await this.sheepCollarService.assign({
+          collarId: updateSheepDto.collarId,
+          sheepId: id,
+        });
+      } else  if (sheep && sheep.collar && sheep.collar.id && !updateSheepDto.collarId) {
+        await this.sheepCollarService.unassign({ sheepId: id, collarId: sheep.collar.id });
       }
 
       const updatedSheep = this.sheepRepository.merge(sheep, updateSheepDto);
-      console.log('Merging ', sheep, ' with ', updateSheepDto, ' to get ', updatedSheep);
+      await this.sheepRepository.save(updatedSheep);
+    
+      return this.toSheepDto(updatedSheep);
 
-      return await this.sheepRepository.save(updatedSheep);
     } catch (e) {
       Logger.debug(e);
       throw new Error('Error al actualizar la oveja');
-    }
-  }
-
-  async updateCollar(sheepId: string, collarId: string | null) {
-    const sheep = await this.sheepRepository.findOneBy({ id: sheepId });
-    console.log('La encontre, ', sheep);
-    if (sheep) {
-      sheep.collarId = collarId;
-      console.log('Quedo , ', sheep);
-      return this.sheepRepository.save(sheep);
     }
   }
 
@@ -108,9 +94,7 @@ export class SheepService extends BaseService {
   async findAll(establishmentId: EstablishmentEntity['id'], filter?: SheepFilterDto) {
     const sheepIds = await this.paddocksService.getSheepIdsFrom({ establishmentId });
 
-    const sheep = (await this.findByIds(sheepIds, ['paddock', 'collar'])).map((sheep) =>
-      this.toSheepDto(sheep)
-    );
+    const sheep = (await this.findByIds(sheepIds)).map((sheep) => this.toSheepDto(sheep));
 
     if (filter?.status) {
       return sheep.filter((sheep) => {
@@ -125,19 +109,33 @@ export class SheepService extends BaseService {
     return sheep;
   }
 
-  async findByIds(ids: string[], relations?: string[]): Promise<SheepEntity[]> {
-    return await this.sheepRepository.find({ where: { id: In(ids) }, relations });
+  async findByIds(ids: string[]): Promise<SheepEntity[]> {
+    if (ids.length === 0) return [];
+    return await this.sheepRepository
+      .createQueryBuilder('sheep')
+      .leftJoinAndSelect('sheep.paddock', 'paddock')
+      .leftJoinAndSelect('sheep.breed', 'breed')
+      .leftJoin(SheepCollarEntity, 'sc', 'sc.sheepId = sheep.id AND sc.assignedUntil IS NULL')
+      .leftJoinAndMapOne('sheep.collar', CollarEntity, 'collar', 'collar.id = sc.collarId')
+      .where('sheep.id IN (:...ids)', { ids })
+      .getMany();
   }
 
   async findOne(id: SheepEntity['id']) {
-    const sheep = await this.sheepRepository.findOne({
-      where: { id },
-      relations: ['collar', 'paddock', 'breed'],
-    });
+    const sheep = await this.sheepRepository
+      .createQueryBuilder('sheep')
+      .leftJoinAndSelect('sheep.paddock', 'paddock')
+      .leftJoinAndSelect('sheep.breed', 'breed')
+      .leftJoin(SheepCollarEntity, 'sc', 'sc.sheepId = sheep.id AND sc.assignedUntil IS NULL')
+      .leftJoinAndMapOne('sheep.collar', CollarEntity, 'collar', 'collar.id = sc.collarId')
+      .where('sheep.id = :id', { id })
+      .getOne();
+    
+    console.log('SHEEP FOUND: ', sheep);
 
     if (!sheep) throw new Error('Collar not found');
 
-    return this.toSheepDto(sheep);
+    return sheep;
   }
 
   async remove(id: SheepEntity['id']) {

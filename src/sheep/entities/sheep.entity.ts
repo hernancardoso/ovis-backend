@@ -42,13 +42,9 @@ export class SheepEntity extends TimestampedEntity {
   @Column({ nullable: false })
   paddockId: PaddockEntity['id'];
 
-  @OneToMany(() => SheepCollarEntity, (sheepCollar) => sheepCollar.collar)
+  @OneToMany(() => SheepCollarEntity, (sheepCollar) => sheepCollar.sheep)
   sheep_history: SheepCollarEntity[];
 
   @OneToOne(() => CollarEntity, (collar) => collar.sheep)
-  @JoinColumn({ name: 'collarId' })
   collar: CollarEntity;
-
-  @Column({ nullable: true })
-  collarId: CollarEntity['id'] | null; // Foreign key to CollarEntity
 }
