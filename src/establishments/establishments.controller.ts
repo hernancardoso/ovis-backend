@@ -47,16 +47,34 @@ export class EstablishmentsController {
   }
 
   @Get()
-  find(@User('establishmentId') establishmentId: IUser['establishmentId']) {
-    return this.establishmentsService.findByIdOrFail(establishmentId, ['breeds']);
+  find(@User() user: IUser, @User('establishmentId') establishmentId?: string) {
+    // If establishmentId is provided via query param (handled by decorator), use it
+    // Otherwise, get establishmentId from establishmentIds array or fallback to establishmentId
+    const finalEstablishmentId = establishmentId || user.establishmentIds?.[0] || user.establishmentId;
+    
+    // If user is admin and has no establishment, return all establishments
+    if (!finalEstablishmentId && user.isAdmin) {
+      return this.establishmentsService.findAll();
+    }
+    
+    if (!finalEstablishmentId) {
+      throw new UnauthorizedException('Establishment ID is required');
+    }
+    return this.establishmentsService.findByIdOrFail(finalEstablishmentId, ['breeds']);
   }
 
   @Get(':id')
   findOne(
     @Param('id') establishmentId: EstablishmentEntity['id'],
-    @User('establishmentId') establishmentRequestId: IUser['establishmentId']
+    @User() user: IUser
   ) {
-    if (establishmentId !== establishmentRequestId) throw new ForbiddenException("Can't access");
+    // Check if user has access to this establishment
+    const userEstablishmentIds = user.establishmentIds || (user.establishmentId ? [user.establishmentId] : []);
+    const hasAccess = user.isAdmin || userEstablishmentIds.includes(establishmentId);
+    
+    if (!hasAccess) {
+      throw new ForbiddenException("Can't access");
+    }
 
     return this.establishmentsService.findByIdOrFail(establishmentId, [
       'breeds',

@@ -43,10 +43,14 @@ export class BreedsService {
   async remove(id: number) {
     try {
       const breed = await this.breedsRepository.findOneBy({ id });
-      if (!breed) throw new Error('Breed not found');
-      return await this.breedsRepository.remove(breed);
+      if (!breed) {
+        throw new Error('Breed not found');
+      }
+      await this.breedsRepository.remove(breed);
+      return { success: true };
     } catch (e) {
       Logger.error(e);
+      throw e;
     }
   }
 

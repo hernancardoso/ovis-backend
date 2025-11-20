@@ -35,7 +35,11 @@ export class PaddocksService {
   }
 
   async findAll(establishmentId: EstablishmentEntity['id']) {
-    return this.paddockRepository.find({ where: { establishmentId } });
+    return this.paddockRepository.find({ 
+      where: { establishmentId },
+      relations: ['sheep'],
+      order: { createdAt: 'DESC' }
+    });
   }
 
   async getSheepFrom({

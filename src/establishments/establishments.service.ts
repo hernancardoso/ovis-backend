@@ -82,7 +82,9 @@ export class EstablishmentsService {
   }
 
   async findAll() {
-    return this.establishmentRepository.find();
+    return this.establishmentRepository.find({
+      relations: ['breeds', 'collars', 'paddocks'],
+    });
   }
 
   async findById(id: string) {

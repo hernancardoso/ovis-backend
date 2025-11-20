@@ -9,11 +9,25 @@ export class EstablishmentGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const user = request.user;
 
-    if (!user || !user.establishmentId) {
+    // Admins can access any establishment
+    if (user?.isAdmin) {
+      // If establishmentId is provided in query/params, use it; otherwise allow access
+      const establishmentId = request.query?.establishmentId || request.params?.establishmentId;
+      if (establishmentId) {
+        request.establishmentId = establishmentId;
+      }
+      return true;
+    }
+
+    // Regular users need at least one establishment
+    const establishmentIds = user?.establishmentIds || (user?.establishmentId ? [user.establishmentId] : []);
+    if (establishmentIds.length === 0) {
       return false;
     }
 
-    request.establishmentId = user.establishmentId;
+    // Use the first establishment ID for backward compatibility
+    request.establishmentId = establishmentIds[0];
+    request.establishmentIds = establishmentIds;
     return true;
   }
 }
