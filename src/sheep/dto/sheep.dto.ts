@@ -20,7 +20,7 @@ export class SheepDto {
   tags: string[];
 
   @Expose()
-  paddock: PaddockReducedDto;
+  paddock?: PaddockReducedDto;
 
   @Expose()
   collar?: CollarReducedDto | null;

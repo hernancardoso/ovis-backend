@@ -32,6 +32,7 @@ export class CollarEntity extends TimestampedEntity {
     type: 'bigint',
     default: 33,
     transformer: [BigIntToNumberTransformer],
+    unique: true,
   })
   imei: number;
 

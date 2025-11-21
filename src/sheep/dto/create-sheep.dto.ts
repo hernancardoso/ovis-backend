@@ -17,8 +17,10 @@ export class CreateSheepDto {
   @Transform(({ value }) => (value === '' ? null : value))
   breedId: BreedsEntity['id'];
 
+  @IsOptional()
   @IsUUID()
-  paddockId: PaddockEntity['id'];
+  @Transform(({ value }) => (value === '' ? null : value))
+  paddockId?: PaddockEntity['id'];
 
   @IsOptional()
   @IsUUID()

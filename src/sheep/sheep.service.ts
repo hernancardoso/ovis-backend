@@ -94,7 +94,20 @@ export class SheepService extends BaseService {
   async findAll(establishmentId: EstablishmentEntity['id'], filter?: SheepFilterDto) {
     const sheepIds = await this.paddocksService.getSheepIdsFrom({ establishmentId });
 
-    const sheep = (await this.findByIds(sheepIds)).map((sheep) => this.toSheepDto(sheep));
+    // Also get sheep without paddock (paddockId IS NULL)
+    const sheepWithoutPaddock = await this.sheepRepository
+      .createQueryBuilder('sheep')
+      .leftJoinAndSelect('sheep.paddock', 'paddock')
+      .leftJoinAndSelect('sheep.breed', 'breed')
+      .leftJoin(SheepCollarEntity, 'sc', 'sc.sheepId = sheep.id AND sc.assignedUntil IS NULL')
+      .leftJoinAndMapOne('sheep.collar', CollarEntity, 'collar', 'collar.id = sc.collarId')
+      .where('sheep.paddockId IS NULL')
+      .getMany();
+
+    const allSheepIds = [...sheepIds, ...sheepWithoutPaddock.map(s => s.id)];
+    const uniqueSheepIds = [...new Set(allSheepIds)];
+
+    const sheep = (await this.findByIds(uniqueSheepIds)).map((sheep) => this.toSheepDto(sheep));
 
     if (filter?.status) {
       return sheep.filter((sheep) => {

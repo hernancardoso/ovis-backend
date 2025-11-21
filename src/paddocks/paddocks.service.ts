@@ -21,15 +21,16 @@ export class PaddocksService {
     const paddock = this.paddockRepository.create(createPaddockDto);
     paddock.establishmentId = establishmentId;
 
-    //if (createPaddockDto.sheepIds && createPaddockDto.sheepIds.length > 0) {
-    // try {
-    //   const sheep = await this.sheepService.findByIds(createPaddockDto.sheepIds);
-    //   paddock.sheep = sheep;
-    // } catch (e) {
-    //   throw new Error('Error al buscar las ovejas');
-    // }
-    //}
-    // paddock.sheep = await this.sheepService.findByIds(createPaddockDto.sheepIds);
+    if (createPaddockDto.sheepIds && createPaddockDto.sheepIds.length > 0) {
+      try {
+        const sheep = await this.sheepService.findByIds(createPaddockDto.sheepIds);
+        paddock.sheep = sheep;
+      } catch (e) {
+        throw new Error('Error al buscar las ovejas');
+      }
+    } else {
+      paddock.sheep = [];
+    }
 
     return await this.paddockRepository.save(paddock);
   }
@@ -77,9 +78,13 @@ export class PaddocksService {
       paddock.name = updatePaddockDto.name;
     }
 
-    if (updatePaddockDto.sheepIds) {
+    if (updatePaddockDto.sheepIds !== undefined) {
       try {
-        paddock.sheep = await this.sheepService.findByIds(updatePaddockDto.sheepIds);
+        if (updatePaddockDto.sheepIds.length === 0) {
+          paddock.sheep = [];
+        } else {
+          paddock.sheep = await this.sheepService.findByIds(updatePaddockDto.sheepIds);
+        }
       } catch (e) {
         throw new Error('Error al buscar las ovejas');
       }

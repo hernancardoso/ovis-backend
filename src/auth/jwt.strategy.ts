@@ -24,8 +24,6 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   async validate(payload: { [key: string]: any }) {
-    // Only use custom:establishmentIds (not custom:establishmentId)
-    console.log('payload', payload);
     const establishmentIdsStr = payload['custom:establishmentIds'] || '';
     const establishmentIds = establishmentIdsStr 
       ? (establishmentIdsStr.includes(',') ? establishmentIdsStr.split(',').map(id => id.trim()).filter(Boolean) : [establishmentIdsStr])

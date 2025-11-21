@@ -37,10 +37,10 @@ export class SheepEntity extends TimestampedEntity {
 
   @ManyToOne(() => PaddockEntity, (paddock) => paddock.sheep)
   @JoinColumn({ name: 'paddockId' })
-  paddock: PaddockEntity;
+  paddock?: PaddockEntity;
 
-  @Column({ nullable: false })
-  paddockId: PaddockEntity['id'];
+  @Column({ nullable: true })
+  paddockId?: PaddockEntity['id'];
 
   @OneToMany(() => SheepCollarEntity, (sheepCollar) => sheepCollar.sheep)
   sheep_history: SheepCollarEntity[];

@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { CreateCollarDto } from './dto/create-collar.dto';
 import { UpdateCollarDto } from './dto/update-collar.dto';
 import { CollarEntity } from './entities/collar.entity';
@@ -28,13 +28,37 @@ export class CollarsService extends BaseService {
   }
 
   async create(establishmentId: EstablishmentEntity['id'], createCollarDto: CreateCollarDto) {
-    const { sheepId, ...collarData } = createCollarDto;
-    const collar = this.collarRepository.create(collarData);
-    collar.establishmentId = establishmentId;
+    try {
+      const { sheepId, ...collarData } = createCollarDto;
+      
+      // Verificar si el IMEI ya existe
+      const existingCollar = await this.collarRepository.findOne({
+        where: { imei: createCollarDto.imei },
+      });
+      
+      if (existingCollar) {
+        throw new BadRequestException(`El IMEI ${createCollarDto.imei} ya está registrado en el sistema`);
+      }
 
-    const savedCollar = await this.collarRepository.save(collar);
-    if (sheepId) this.sheepCollarService.assign({ collarId: savedCollar.id, sheepId });
-    return savedCollar;
+      const collar = this.collarRepository.create(collarData);
+      collar.establishmentId = establishmentId;
+
+      const savedCollar = await this.collarRepository.save(collar);
+      if (sheepId) this.sheepCollarService.assign({ collarId: savedCollar.id, sheepId });
+      return savedCollar;
+    } catch (e: any) {
+      Logger.error(e);
+      // Si ya es una BadRequestException, re-lanzarla
+      if (e instanceof BadRequestException) {
+        throw e;
+      }
+      // Si es un error de duplicado de base de datos, devolver mensaje más claro
+      if (e.code === 'ER_DUP_ENTRY' || e.message?.includes('Duplicate entry')) {
+        throw new BadRequestException(`El IMEI ${createCollarDto.imei} ya está registrado en el sistema`);
+      }
+      // Para otros errores, lanzar un error genérico
+      throw new BadRequestException('Error al crear el collar. Verifique que el IMEI no esté duplicado.');
+    }
   }
 
   async update(
@@ -45,7 +69,6 @@ export class CollarsService extends BaseService {
     try {
       const collar = await this.findOne(id, false) as CollarEntity;
 
-      console.log("updateCollarDto", updateCollarDto);
 
       
       if (updateCollarDto.sheepId !== "" && updateCollarDto.sheepId !== undefined) {
