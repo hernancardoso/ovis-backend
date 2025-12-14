@@ -26,27 +26,47 @@ export class DynamoDBCollarService {
   private readonly collarInitialInfoTableName = 'collar_initial_info';
 
   private parseLatest(item: any) {
-    const parsed_status = item.latest_status_json ? JSON.parse(item.latest_status_json) : null;
-    const parsed_location = item.latest_location_json
+    const parsedStatus = item.latest_status_json 
+      ? JSON.parse(item.latest_status_json) 
+      : null;
+    
+    const parsedLocation = item.latest_location_json
       ? JSON.parse(item.latest_location_json)
       : null;
 
-    const ts = parsed_status?.timestamp;
+    const location_timestamp = parsedLocation?.timestamp;
+    
+    // Validate and build latestLocation
+    const hasValidLocation = parsedLocation 
+      && parsedLocation.lat != null 
+      && parsedLocation.long != null 
+      && location_timestamp != null;
+    
+    const latestLocation = hasValidLocation
+      ? {
+          timestamp: location_timestamp,
+          lat: parsedLocation.lat,
+          long: parsedLocation.long,
+        }
+      : undefined;
+
+    // Validate and build latestStatus
+    const status_timestamp = parsedStatus?.timestamp;
+    const hasValidStatus = parsedStatus && status_timestamp != null;
+    
+    const latestStatus = hasValidStatus
+      ? {
+          timestamp: status_timestamp,
+          battery_voltage: parsedStatus.battery_voltage ?? null,
+          rsrp: parsedStatus.rsrp ?? null,
+          suse: parsedStatus.suse ?? null,
+          stot: parsedStatus.stot ?? null,
+        }
+      : undefined;
+
     return {
-      latestLocation:
-        parsed_location && parsed_location.lat != null && parsed_location.long != null && ts != null
-          ? { timestamp: ts, lat: parsed_location.lat, long: parsed_location.long }
-          : undefined,
-      latestStatus:
-        parsed_status && ts != null
-          ? {
-              timestamp: ts,
-              battery_voltage: parsed_status.battery_voltage ?? null,
-              rsrp: parsed_status.rsrp ?? null,
-              suse: parsed_status.suse ?? null,
-              stot: parsed_status.stot ?? null,
-            }
-          : undefined,
+      latestLocation,
+      latestStatus,
     };
   }
 
