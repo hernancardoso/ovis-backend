@@ -12,7 +12,7 @@ import { PaddocksModule } from 'src/paddocks/paddocks.module';
     TypeOrmModule.forFeature([SheepCollarEntity]),
     forwardRef(() => CollarsModule),
     forwardRef(() => SheepModule),
-    PaddocksModule,
+    forwardRef(() => PaddocksModule),
   ],
   controllers: [SheepCollarController],
   providers: [SheepCollarService],

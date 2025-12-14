@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString, IsInt, Min } from 'class-validator';
 
 export class CreateEstablishmentDto {
   @IsString()
@@ -11,4 +11,14 @@ export class CreateEstablishmentDto {
   @IsOptional()
   @IsString({ each: true })
   tags?: string[];
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  onlineThresholdHours?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  staleThresholdHours?: number;
 }

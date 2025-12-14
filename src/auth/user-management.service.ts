@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   CognitoIdentityProviderClient,
@@ -20,6 +20,7 @@ import { UpdateUserDto } from './dtos/update-user.dto';
 
 @Injectable()
 export class UserManagementService {
+  private readonly logger = new Logger(UserManagementService.name);
   private cognitoClient: CognitoIdentityProviderClient;
   private userPoolId: string;
 
@@ -226,9 +227,13 @@ export class UserManagementService {
       const attributes: AttributeType[] = [];
 
       if (updateUserDto.establishmentIds !== undefined) {
+        // If array is empty, set empty string to clear the attribute
+        const establishmentIdsValue = updateUserDto.establishmentIds.length > 0 
+          ? updateUserDto.establishmentIds.join(',') 
+          : '';
         attributes.push({
           Name: 'custom:establishmentIds',
-          Value: updateUserDto.establishmentIds.join(','),
+          Value: establishmentIdsValue,
         });
       }
 
@@ -324,6 +329,44 @@ export class UserManagementService {
     });
 
     await this.cognitoClient.send(command);
+  }
+
+  async removeEstablishmentFromAllUsers(establishmentId: string) {
+    try {
+      // Obtener todos los usuarios
+      const allUsers = await this.listUsers();
+      
+      // Filtrar usuarios que tienen el establishmentId
+      const usersWithEstablishment = allUsers.filter(
+        (user) => user.establishmentIds && user.establishmentIds.includes(establishmentId)
+      );
+
+      this.logger.log(`Found ${usersWithEstablishment.length} users with establishment ${establishmentId}`);
+
+      // Actualizar cada usuario removiendo el establishmentId
+      const updatePromises = usersWithEstablishment.map(async (user) => {
+        const updatedEstablishmentIds = user.establishmentIds.filter((id) => id !== establishmentId);
+        
+        this.logger.log(`Updating user ${user.email}: removing establishment ${establishmentId}. Remaining: ${updatedEstablishmentIds.join(',') || 'none'}`);
+        
+        // Si después de remover no quedan establecimientos, dejamos un array vacío
+        await this.updateUser(user.email, {
+          establishmentIds: updatedEstablishmentIds,
+        });
+      });
+
+      await Promise.all(updatePromises);
+
+      this.logger.log(`Successfully updated ${usersWithEstablishment.length} users in Cognito`);
+
+      return {
+        message: `Establishment removed from ${usersWithEstablishment.length} user(s)`,
+        affectedUsers: usersWithEstablishment.length,
+      };
+    } catch (error: any) {
+      this.logger.error(`Error in removeEstablishmentFromAllUsers: ${error.message}`, error.stack);
+      throw new BadRequestException(`Failed to remove establishment from users: ${error.message}`);
+    }
   }
 }
 

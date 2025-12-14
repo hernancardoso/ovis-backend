@@ -95,6 +95,6 @@ export class EstablishmentsController {
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.establishmentsService.remove(+id);
+    return this.establishmentsService.remove(id);
   }
 }

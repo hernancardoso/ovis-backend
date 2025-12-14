@@ -15,6 +15,12 @@ export class EstablishmentEntity extends TimestampedEntity {
   @Column({ type: 'simple-array' })
   tags: string[];
 
+  @Column({ type: 'int', default: 1 })
+  onlineThresholdHours: number;
+
+  @Column({ type: 'int', default: 24 })
+  staleThresholdHours: number;
+
   @ManyToMany(() => BreedsEntity, (breed) => breed.establishments)
   @JoinTable()
   breeds: BreedsEntity[];

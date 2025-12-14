@@ -1,4 +1,4 @@
-import { forwardRef, Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { CreateSheepDto } from './dto/create-sheep.dto';
 import { UpdateSheepDto } from './dto/update-sheep.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -143,10 +143,10 @@ export class SheepService extends BaseService {
       .leftJoinAndMapOne('sheep.collar', CollarEntity, 'collar', 'collar.id = sc.collarId')
       .where('sheep.id = :id', { id })
       .getOne();
-    
-    console.log('SHEEP FOUND: ', sheep);
 
-    if (!sheep) throw new Error('Collar not found');
+    if (!sheep) {
+      throw new NotFoundException('Sheep not found');
+    }
 
     return sheep;
   }

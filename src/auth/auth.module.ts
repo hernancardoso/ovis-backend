@@ -14,5 +14,6 @@ import { UserManagementController } from './user-management.controller';
   imports: [PassportModule.register({ defaultStrategy: 'jwt' })],
   providers: [AuthService, AwsCognitoService, JwtStrategy, UserManagementService],
   controllers: [AuthController, UserManagementController],
+  exports: [UserManagementService],
 })
 export class AuthModule {}
