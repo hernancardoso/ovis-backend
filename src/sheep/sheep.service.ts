@@ -67,6 +67,18 @@ export class SheepService extends BaseService {
         await this.sheepCollarService.unassign({ sheepId: id, collarId: sheep.collar.id });
       }
 
+      // Explicitly handle breedId and breed relationship
+      if (updateSheepDto.breedId === null || updateSheepDto.breedId === undefined) {
+        sheep.breedId = null as any;
+        sheep.breed = null as any;
+      }
+
+      // Explicitly handle paddockId and paddock relationship
+      if (updateSheepDto.paddockId === null || updateSheepDto.paddockId === undefined) {
+        sheep.paddockId = null as any;
+        sheep.paddock = null as any;
+      }
+
       const updatedSheep = this.sheepRepository.merge(sheep, updateSheepDto);
       await this.sheepRepository.save(updatedSheep);
     
