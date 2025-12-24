@@ -41,7 +41,7 @@ export class SheepService extends BaseService {
           console.log('El collar seleccionado no está disponible');
         }
       }
-      return sheep;
+      return await this.findOne(sheep.id);
     } catch (e) {
       Logger.error(e);
       throw new Error(
@@ -56,33 +56,15 @@ export class SheepService extends BaseService {
     updateSheepDto: UpdateSheepDto
   ) {
     try {
+      const { collarId: newCollarId, paddockId, ...mergeSheep } = updateSheepDto;
       const sheep = await this.findOne(id);
 
-      if(updateSheepDto.collarId) {
-        await this.sheepCollarService.assign({
-          collarId: updateSheepDto.collarId,
-          sheepId: id,
-        });
-      } else  if (sheep && sheep.collar && sheep.collar.id && !updateSheepDto.collarId) {
-        await this.sheepCollarService.unassign({ sheepId: id, collarId: sheep.collar.id });
-      }
+      await this.sheepCollarService.handleAssociation(sheep, newCollarId);
 
-      // Explicitly handle breedId and breed relationship
-      if (updateSheepDto.breedId === null || updateSheepDto.breedId === undefined) {
-        sheep.breedId = null as any;
-        sheep.breed = null as any;
-      }
+      const newPaddockId = paddockId === '' || paddockId === null ? null : paddockId;
 
-      // Explicitly handle paddockId and paddock relationship
-      if (updateSheepDto.paddockId === null || updateSheepDto.paddockId === undefined) {
-        sheep.paddockId = null as any;
-        sheep.paddock = null as any;
-      }
-
-      const updatedSheep = this.sheepRepository.merge(sheep, updateSheepDto);
-      await this.sheepRepository.save(updatedSheep);
-    
-      return this.toSheepDto(updatedSheep);
+      await this.sheepRepository.update(id, { paddockId: newPaddockId as any, ...mergeSheep });
+      return await this.findOne(id);
 
     } catch (e) {
       Logger.debug(e);
@@ -93,14 +75,6 @@ export class SheepService extends BaseService {
   async findByIdOrFail(id: string, relations: ('paddock' | 'collar')[] = []) {
     if (!id) throw new Error('La id del collar no puede ser vacía');
     return await this.sheepRepository.findOneOrFail({ where: { id: id ?? '' }, relations });
-  }
-
-  private toSheepDto(sheep: SheepEntity) {
-    return this.toDto(SheepDto, sheep, {
-      collar: sheep.collar ? { id: sheep.collar.id, name: sheep.collar.name } : undefined,
-      paddock: sheep.paddock ? { id: sheep.paddock.id, name: sheep.paddock.name } : undefined,
-      breed: sheep.breed ? { id: sheep.breed.id.toString(), name: sheep.breed.name } : undefined,
-    });
   }
 
   async findAll(establishmentId: EstablishmentEntity['id'], filter?: SheepFilterDto) {
@@ -119,19 +93,7 @@ export class SheepService extends BaseService {
     const allSheepIds = [...sheepIds, ...sheepWithoutPaddock.map(s => s.id)];
     const uniqueSheepIds = [...new Set(allSheepIds)];
 
-    const sheep = (await this.findByIds(uniqueSheepIds)).map((sheep) => this.toSheepDto(sheep));
-
-    if (filter?.status) {
-      return sheep.filter((sheep) => {
-        const isAssociated = Boolean(sheep.collar?.id);
-        return (
-          (filter.status === AssignationStatus.ASSIGNED && isAssociated) ||
-          (filter.status !== AssignationStatus.ASSIGNED && !isAssociated)
-        );
-      });
-    }
-
-    return sheep;
+    return await this.findByIds(uniqueSheepIds);
   }
 
   async findByIds(ids: string[]): Promise<SheepEntity[]> {
@@ -164,6 +126,7 @@ export class SheepService extends BaseService {
   }
 
   async remove(id: SheepEntity['id']) {
+    await this.sheepCollarService.unassign({ sheepId: id });
     const result = await this.sheepRepository.softDelete({ id });
 
     if (!result.affected) throw new Error('No se pudo borrar');

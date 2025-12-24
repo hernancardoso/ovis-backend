@@ -1,4 +1,6 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { CreateSheepDto } from './create-sheep.dto';
 
-export class UpdateSheepDto extends PartialType(CreateSheepDto) {}
+export class UpdateSheepDto extends PartialType(CreateSheepDto) {
+    collarId: string | null;
+}

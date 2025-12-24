@@ -3,5 +3,5 @@ import { CreateCollarDto } from './create-collar.dto';
 import { SheepDto } from 'src/sheep/dto/sheep.dto';
 
 export class UpdateCollarDto extends PartialType(CreateCollarDto) {
-    sheep?: SheepDto;
+    sheepId: string | null;
 }

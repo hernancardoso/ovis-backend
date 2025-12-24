@@ -52,10 +52,4 @@ export class CollarEntity extends TimestampedEntity {
   @OneToMany(() => SheepCollarEntity, (sheepCollar) => sheepCollar.collar)
   sheep_history: SheepCollarEntity[];
 
-  @OneToOne(() => SheepEntity, (sheep) => sheep.collar)
-  @JoinColumn({ name: 'sheepId' }) // This is the owning side of the relationship
-  sheep: SheepEntity;
-
-  @Column({ nullable: true })
-  sheepId: SheepEntity['id'] | null; // Foreign key to SheepEntity
 }

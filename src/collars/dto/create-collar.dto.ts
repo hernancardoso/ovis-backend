@@ -11,7 +11,7 @@ export class CreateCollarDto {
   @IsOptional()
   @IsUUID()
   @Transform(({ value }) => (value === '' ? null : value))
-  sheepId?: string;
+  sheepId?: string | null;
 
   @IsOptional()
   @IsBoolean()

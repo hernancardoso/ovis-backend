@@ -1,15 +1,17 @@
 import { Entity, Column, PrimaryColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { CollarEntity } from 'src/collars/entities/collar.entity';
 import { SheepEntity } from 'src/sheep/entities/sheep.entity';
+import { TimestampedEntity } from 'src/commons/entities/timestamped.entity';
 
-@Index('uniq_active_sheep_collar', ['sheepId', 'collarId'], {
+@Index('uniq_active_sheep_collar', ['sheepId', 'collarId', 'isActive'], {
   unique: true,
   where: 'assignedUntil IS NULL', // enforce one active collar per sheep
 })
 @Entity()
-export class SheepCollarEntity {
+export class SheepCollarEntity extends TimestampedEntity {
   @PrimaryColumn({ type: 'char', length: 36 })
   sheepId: string;
+
 
   @ManyToOne(() => SheepEntity, (sheep) => sheep.sheep_history)
   @JoinColumn({ name: 'sheepId' })
@@ -27,4 +29,11 @@ export class SheepCollarEntity {
 
   @Column({ type: 'datetime', nullable: true })
   assignedUntil?: Date;
+
+  @Column({
+    type: 'tinyint',
+    generatedType: 'VIRTUAL',
+    asExpression: 'assignedUntil IS NULL',
+  })
+  isActive: boolean;
 }

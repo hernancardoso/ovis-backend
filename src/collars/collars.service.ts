@@ -31,7 +31,6 @@ export class CollarsService extends BaseService {
     try {
       const { sheepId, ...collarData } = createCollarDto;
       
-      // Verificar si el IMEI ya existe
       const existingCollar = await this.collarRepository.findOne({
         where: { imei: createCollarDto.imei },
       });
@@ -45,18 +44,9 @@ export class CollarsService extends BaseService {
 
       const savedCollar = await this.collarRepository.save(collar);
       if (sheepId) this.sheepCollarService.assign({ collarId: savedCollar.id, sheepId });
-      return savedCollar;
+      return await this.findOne(savedCollar.id);
     } catch (e: any) {
       Logger.error(e);
-      // Si ya es una BadRequestException, re-lanzarla
-      if (e instanceof BadRequestException) {
-        throw e;
-      }
-      // Si es un error de duplicado de base de datos, devolver mensaje más claro
-      if (e.code === 'ER_DUP_ENTRY' || e.message?.includes('Duplicate entry')) {
-        throw new BadRequestException(`El IMEI ${createCollarDto.imei} ya está registrado en el sistema`);
-      }
-      // Para otros errores, lanzar un error genérico
       throw new BadRequestException('Error al crear el collar. Verifique que el IMEI no esté duplicado.');
     }
   }
@@ -68,21 +58,13 @@ export class CollarsService extends BaseService {
   ) {
     try {
       const collar = await this.findOne(id, false) as CollarEntity;
+      const {sheepId: newSheepId, ...mergeCollar} = updateCollarDto;
 
-
-      
-      if (updateCollarDto.sheepId !== "" && updateCollarDto.sheepId !== undefined) {
-        console.log("tendria que haber entrado aca?")
-        await this.sheepCollarService.assign({ collarId: id, sheepId: updateCollarDto.sheepId });
-      } else if (collar.sheepId && !updateCollarDto.sheepId) {
-        console.log("tendria que haber entrado aca????")
-        await this.sheepCollarService.unassign({ sheepId: collar.sheepId, collarId: id });
-      }
-      const {sheep, ...mergeCollar} = updateCollarDto;
+      await this.sheepCollarService.handleAssociation(collar, newSheepId);
       const updatedCollar = this.collarRepository.merge(collar, mergeCollar);
       const savedCollar = await this.collarRepository.save(updatedCollar);
 
-      return this.toCollarDto(savedCollar);
+      return await this.findOne(savedCollar.id);
       
     } catch (e) {
       Logger.debug(e);
@@ -90,18 +72,7 @@ export class CollarsService extends BaseService {
     }
   }
 
-  private async toCollarDto(
-    collar: CollarEntity,
-    dynamoData?: { latestLocation?: any; latestStatus?: any }
-  ) {
-    return this.toDto(CollarDto, collar, {
-      sheep: collar.sheep
-        ? { id: collar.sheep.id, name: collar.sheep.name, tags: collar.sheep.tags }
-        : null,
-      latestLocation: dynamoData?.latestLocation || null,
-      latestStatus: dynamoData?.latestStatus || null,
-    });
-  }
+
 
   async findAll(establishmentId: EstablishmentEntity['id'], filter?: CollarFilterDto) {
     const collars = await this.collarRepository
@@ -115,33 +86,21 @@ export class CollarsService extends BaseService {
       .leftJoinAndMapOne('collar.sheep', 'sheep', 'sheep', 'sheep.id = sc.sheepId')
       .getMany();
 
-    // Get IMEIs for DynamoDB lookup
     const imeis = collars.map((collar) => collar.imei);
-
-    // Fetch latest activity data from DynamoDB
     const dynamoDataMap = await this.dynamoDBCollarService.getMultipleCollarLastActivity(imeis);
 
-    // Create DTOs with DynamoDB data
     const collarsDtos = await Promise.all(
       collars.map(async (collar) => {
         const dynamoData = dynamoDataMap.get(Number(collar.imei));
 
-        return this.toCollarDto(collar, {
+        return {
+          ...collar,
           latestLocation: dynamoData?.latestLocation,
           latestStatus: dynamoData?.latestStatus,
-        });
+        }
       })
     );
 
-    if (filter?.status) {
-      return collarsDtos.filter((collar) => {
-        const isAssociated = Boolean(collar.sheep?.id);
-        return (
-          (filter.status === AssignationStatus.ASSIGNED && isAssociated) ||
-          (filter.status !== AssignationStatus.ASSIGNED && !isAssociated)
-        );
-      });
-    }
 
     return collarsDtos;
   }
@@ -169,16 +128,16 @@ export class CollarsService extends BaseService {
     // Fetch latest activity data from DynamoDB
     const dynamoData = await this.dynamoDBCollarService.getCollarLastActivity(collar.imei);
 
-    const collarDto = await this.toCollarDto(collar, {
+    return {
+      ...collar,
       latestLocation: dynamoData?.latestLocation,
       latestStatus: dynamoData?.latestStatus,
-    });
-    if (!toDto) return collar;
+    }
 
-    return collarDto;
   }
 
   async remove(id: string) {
+    await this.sheepCollarService.unassign({ collarId: id });
     const result = await this.collarRepository.softDelete({ id });
 
     if (!result.affected) throw new Error('No se pudo borrar');

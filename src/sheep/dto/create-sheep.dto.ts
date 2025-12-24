@@ -25,7 +25,8 @@ export class CreateSheepDto {
   @IsOptional()
   @IsUUID()
   @Transform(({ value }) => (value === '' ? null : value))
-  collarId: CollarEntity['id'];
+  collarId?: string | null;
+  
 
   @IsOptional()
   @IsString({ each: true })
