@@ -8,10 +8,7 @@ import { EstablishmentEntity } from 'src/establishments/entities/establishment.e
 import { PaddocksService } from 'src/paddocks/paddocks.service';
 import { SheepCollarService } from 'src/sheep-collar/sheep-collar.service';
 import { SheepFilterDto } from './dto/filter-sheep-dto';
-import { AssignationStatus } from 'src/commons/enums/AssignationStatus.enum';
-import { SheepDto } from './dto/sheep.dto';
 import { BaseService } from 'src/commons/services/base.service';
-import { PaddockEntity } from 'src/paddocks/entities/paddock.entity';
 import { CollarEntity } from 'src/collars/entities/collar.entity';
 import { SheepCollarEntity } from 'src/sheep-collar/entities/sheep-collar.entity';
 
@@ -81,12 +78,7 @@ export class SheepService extends BaseService {
     const sheepIds = await this.paddocksService.getSheepIdsFrom({ establishmentId });
 
     // Also get sheep without paddock (paddockId IS NULL)
-    const sheepWithoutPaddock = await this.sheepRepository
-      .createQueryBuilder('sheep')
-      .leftJoinAndSelect('sheep.paddock', 'paddock')
-      .leftJoinAndSelect('sheep.breed', 'breed')
-      .leftJoin(SheepCollarEntity, 'sc', 'sc.sheepId = sheep.id AND sc.assignedUntil IS NULL')
-      .leftJoinAndMapOne('sheep.collar', CollarEntity, 'collar', 'collar.id = sc.collarId')
+    const sheepWithoutPaddock = await this.buildSheepQueryBuilder()
       .where('sheep.paddockId IS NULL')
       .getMany();
 
@@ -98,23 +90,13 @@ export class SheepService extends BaseService {
 
   async findByIds(ids: string[]): Promise<SheepEntity[]> {
     if (ids.length === 0) return [];
-    return await this.sheepRepository
-      .createQueryBuilder('sheep')
-      .leftJoinAndSelect('sheep.paddock', 'paddock')
-      .leftJoinAndSelect('sheep.breed', 'breed')
-      .leftJoin(SheepCollarEntity, 'sc', 'sc.sheepId = sheep.id AND sc.assignedUntil IS NULL')
-      .leftJoinAndMapOne('sheep.collar', CollarEntity, 'collar', 'collar.id = sc.collarId')
+    return await this.buildSheepQueryBuilder()
       .where('sheep.id IN (:...ids)', { ids })
       .getMany();
   }
 
   async findOne(id: SheepEntity['id']) {
-    const sheep = await this.sheepRepository
-      .createQueryBuilder('sheep')
-      .leftJoinAndSelect('sheep.paddock', 'paddock')
-      .leftJoinAndSelect('sheep.breed', 'breed')
-      .leftJoin(SheepCollarEntity, 'sc', 'sc.sheepId = sheep.id AND sc.assignedUntil IS NULL')
-      .leftJoinAndMapOne('sheep.collar', CollarEntity, 'collar', 'collar.id = sc.collarId')
+    const sheep = await this.buildSheepQueryBuilder()
       .where('sheep.id = :id', { id })
       .getOne();
 
@@ -125,11 +107,23 @@ export class SheepService extends BaseService {
     return sheep;
   }
 
-  async remove(id: SheepEntity['id']) {
-    await this.sheepCollarService.unassign({ sheepId: id });
-    const result = await this.sheepRepository.softDelete({ id });
+  /**
+   * Builds a query builder with the standard sheep joins (paddock, breed, collar relationship)
+   */
+  private buildSheepQueryBuilder() {
+    return this.sheepRepository
+      .createQueryBuilder('sheep')
+      .leftJoinAndSelect('sheep.paddock', 'paddock')
+      .leftJoinAndSelect('sheep.breed', 'breed')
+      .leftJoin(SheepCollarEntity, 'sc', 'sc.sheepId = sheep.id AND sc.assignedUntil IS NULL')
+      .leftJoinAndMapOne('sheep.collar', CollarEntity, 'collar', 'collar.id = sc.collarId');
+  }
 
-    if (!result.affected) throw new Error('No se pudo borrar');
+  async remove(id: SheepEntity['id']) {
+    const sheep = await this.findOne(id);
+    await this.sheepCollarService.handleAssociation(sheep, null)
+
+    await this.sheepRepository.softRemove(sheep);
 
     return true;
   }

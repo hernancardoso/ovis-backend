@@ -27,11 +27,14 @@ export class SheepCollarService extends BaseService {
    * @param collarId - The collar id
    * @param sheepId - The sheep id
    * @returns The active association
+   * If both are provided, finds the specific association between them.
+   * If only one is provided, finds any active association for that entity.
    */
   findActiveAssociation({collarId, sheepId}:{collarId?: string, sheepId?: string}) {
-    const where =  collarId 
-      ? { collarId, isActive: true } 
-      : { sheepId, isActive: true };
+    const where: any = { isActive: true };
+    
+    if (collarId) where.collarId = collarId;
+    if (sheepId) where.sheepId = sheepId;
     
     return this.sheepCollarRepository.findOne({
       where,
@@ -44,8 +47,8 @@ export class SheepCollarService extends BaseService {
    */
   isAssociated({ collarId, sheepId }: EitherOr<{ collarId: string }, { sheepId: string }>) {
     const where = collarId 
-      ? { collarId, assignedUntil: IsNull() } 
-      : { sheepId, assignedUntil: IsNull() };
+      ? { collarId, isActive: true} 
+      : { sheepId, isActive: true};
     
     return this.sheepCollarRepository.findOne({
       where,
@@ -62,40 +65,58 @@ export class SheepCollarService extends BaseService {
    * @returns The assigned association
    * @throws QueryFailedError if database constraint is violated
    */
-  async assign(assignCollarToSheepDto: AssignCollarToSheepDto): Promise<SheepCollarEntity> {
-    const { collarId, sheepId } = assignCollarToSheepDto;
-
-    // Check if this exact association already exists and is active
-    const existingAssociation = await this.sheepCollarRepository.findOne({
-      where: { sheepId, collarId, isActive: true },
-    });
-
-    // If the same association is already active, return it
-    if (existingAssociation) {
-      return existingAssociation;
-    }
-
-    // Close any active association for this collar (if assigned to another sheep)
-    const activeForCollar = await this.isAssociated({ collarId });
-    if (activeForCollar && activeForCollar.sheepId !== sheepId) {
-      activeForCollar.assignedUntil = new Date();
-      await this.sheepCollarRepository.save(activeForCollar);
-    }
-
-    // Close any active association for this sheep (if it has another collar)
-    const activeForSheep = await this.isAssociated({ sheepId });
-    if (activeForSheep && activeForSheep.collarId !== collarId) {
-      activeForSheep.assignedUntil = new Date();
-      await this.sheepCollarRepository.save(activeForSheep);
-    }
-
-    // Create new active association
-    const assignedFrom = assignCollarToSheepDto.assignedFrom ?? new Date();
-    const associationEntity = this.sheepCollarRepository.create({ collarId, sheepId, assignedFrom });
-    
-    // Let errors propagate - they will be caught by NestJS exception filter
-    return await this.sheepCollarRepository.save(associationEntity);
+  async assign(dto: AssignCollarToSheepDto): Promise<SheepCollarEntity> {
+    const { sheepId, collarId } = dto;
+  
+    return this.sheepCollarRepository.manager.transaction(
+      async (em) => {
+        const repo = em.getRepository(SheepCollarEntity);
+        const now = dto.assignedFrom ?? new Date();
+  
+        // 1️⃣ misma asociación ya activa → devolverla
+        const sameActive = await repo.findOne({
+          where: { sheepId, collarId, isActive: true },
+          lock: { mode: 'pessimistic_write' },
+        });
+  
+        if (sameActive) {
+          return sameActive;
+        }
+  
+        // 2️⃣ cerrar activo del collar (si existe)
+        const activeForCollar = await repo.findOne({
+          where: { collarId, isActive: true },
+          lock: { mode: 'pessimistic_write' },
+        });
+  
+        if (activeForCollar) {
+          activeForCollar.assignedUntil = now;
+          await repo.save(activeForCollar);
+        }
+  
+        // 3️⃣ cerrar activo de la sheep (si existe)
+        const activeForSheep = await repo.findOne({
+          where: { sheepId, isActive: true },
+          lock: { mode: 'pessimistic_write' },
+        });
+  
+        if (activeForSheep) {
+          activeForSheep.assignedUntil = now;
+          await repo.save(activeForSheep);
+        }
+  
+        // 4️⃣ crear nueva asociación
+        const newAssociation = repo.create({
+          sheepId,
+          collarId,
+          assignedFrom: now,
+        });
+  
+        return repo.save(newAssociation);
+      },
+    );
   }
+  
 
   /**
    * Unassign a collar from a sheep or a sheep from a collar
@@ -172,7 +193,7 @@ export class SheepCollarService extends BaseService {
         if (newSheepId === null || newSheepId === '') {
           return await this.unassign({ collarId });
         } else {
-          if (newSheepId === currentAssociation.collarId) {
+          if (newSheepId === currentAssociation.sheepId) {
             return currentAssociation;
           } else {
             return await this.assign({ collarId, sheepId: newSheepId });

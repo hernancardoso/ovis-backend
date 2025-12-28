@@ -57,10 +57,21 @@ export class CollarsService extends BaseService {
     updateCollarDto: UpdateCollarDto
   ) {
     try {
-      const collar = await this.findOne(id, false) as CollarEntity;
+      const collar = await this.findOne(id) as CollarEntity;
       const {sheepId: newSheepId, ...mergeCollar} = updateCollarDto;
 
       await this.sheepCollarService.handleAssociation(collar, newSheepId);
+
+      if (mergeCollar.imei && mergeCollar.imei !== collar.imei) {
+        const existingCollar = await this.collarRepository.findOne({
+          where: { imei: mergeCollar.imei },
+        });
+        
+        if (existingCollar && existingCollar.id !== id) {
+          throw new BadRequestException(`El IMEI ${mergeCollar.imei} ya está registrado en el sistema`);
+        }
+      }
+      
       const updatedCollar = this.collarRepository.merge(collar, mergeCollar);
       const savedCollar = await this.collarRepository.save(updatedCollar);
 
@@ -72,90 +83,61 @@ export class CollarsService extends BaseService {
     }
   }
 
+  async findOne(id: string) {
+    const collar = await this.buildCollarQueryBuilder()
+      .where('collar.id = :id', { id })
+      .getOne();
 
+    if (!collar) throw new Error('Collar not found');
 
-  async findAll(establishmentId: EstablishmentEntity['id'], filter?: CollarFilterDto) {
-    const collars = await this.collarRepository
-      .createQueryBuilder('collar')
-      .where('collar.establishmentId = :establishmentId', { establishmentId })
-      .leftJoin(
-        SheepCollarEntity,
-        'sc',
-        'sc.collarId = collar.id AND sc.assignedUntil IS NULL'
-      )
-      .leftJoinAndMapOne('collar.sheep', 'sheep', 'sheep', 'sheep.id = sc.sheepId')
+    const [result] = await this.dynamoDBCollarService.enrichCollarsWithActivityData([collar]);
+    return result;
+  }
+
+  async findByIds(ids: string[]) {
+    if (!ids || ids.length === 0) {
+      return [];
+    }
+
+    const collars = await this.buildCollarQueryBuilder()
+      .where('collar.id IN (:...ids)', { ids })
       .getMany();
 
-    const imeis = collars.map((collar) => collar.imei);
-    const dynamoDataMap = await this.dynamoDBCollarService.getMultipleCollarLastActivity(imeis);
-
-    const collarsDtos = await Promise.all(
-      collars.map(async (collar) => {
-        const dynamoData = dynamoDataMap.get(Number(collar.imei));
-
-        return {
-          ...collar,
-          latestLocation: dynamoData?.latestLocation,
-          latestStatus: dynamoData?.latestStatus,
-        }
-      })
-    );
+    return this.dynamoDBCollarService.enrichCollarsWithActivityData(collars);
+  }
 
 
-    return collarsDtos;
+  async remove(id: string) {
+    const collar = await this.findOne(id);
+
+    await this.sheepCollarService.handleAssociation(collar, null);
+    await this.collarRepository.softRemove(collar);
+
+    return true;
+  }
+
+  async findAll(establishmentId: EstablishmentEntity['id'], filter?: CollarFilterDto) {
+    const collars = await this.buildCollarQueryBuilder()
+      .where('collar.establishmentId = :establishmentId', { establishmentId })
+      .getMany();
+
+    return this.dynamoDBCollarService.enrichCollarsWithActivityData(collars);
   }
 
   getInitialInfo(imei: number, limit: number) {
     return this.dynamoDBCollarService.getCollarInitialInfo(imei, limit);
   }
 
-  async findOne(id: string, toDto:boolean = false) {
-    const collar = await this.collarRepository
+
+  private buildCollarQueryBuilder() {
+    return this.collarRepository
       .createQueryBuilder('collar')
-      .where('collar.id = :id', { id })
       .leftJoin(
         SheepCollarEntity,
         'sc',
         'sc.collarId = collar.id AND sc.assignedUntil IS NULL'
       )
-      .leftJoinAndMapOne('collar.sheep', 'sheep', 'sheep', 'sheep.id = sc.sheepId')
-      .getOne();
-
-    if (!collar) throw new Error('Collar not found');
-
-    
-
-    // Fetch latest activity data from DynamoDB
-    const dynamoData = await this.dynamoDBCollarService.getCollarLastActivity(collar.imei);
-
-    return {
-      ...collar,
-      latestLocation: dynamoData?.latestLocation,
-      latestStatus: dynamoData?.latestStatus,
-    }
-
+      .leftJoinAndMapOne('collar.sheep', 'sheep', 'sheep', 'sheep.id = sc.sheepId');
   }
 
-  async remove(id: string) {
-    await this.sheepCollarService.unassign({ collarId: id });
-    const result = await this.collarRepository.softDelete({ id });
-
-    if (!result.affected) throw new Error('No se pudo borrar');
-
-    return true;
-  }
-
-  findById(id: string) {
-    if (!id) throw new Error('La id del collar no puede ser vacía');
-    return this.collarRepository.findOneByOrFail({ id: id ?? '' });
-  }
-
-  findByIdOrFail(id: string) {
-    if (!id) throw new Error('La id del collar no puede ser vacía');
-    return this.collarRepository.findOneByOrFail({ id: id ?? '' });
-  }
-
-  findByIds(ids: string[]): Promise<CollarEntity[]> {
-    return this.collarRepository.findBy({ id: In(ids) });
-  }
 }

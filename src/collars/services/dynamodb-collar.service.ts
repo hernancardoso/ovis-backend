@@ -8,6 +8,7 @@ import {
   BatchGetCommandInput,
   QueryCommand,
 } from '@aws-sdk/lib-dynamodb';
+import { CollarEntity } from '../entities/collar.entity';
 
 @Injectable()
 export class DynamoDBCollarService {
@@ -187,5 +188,60 @@ export class DynamoDBCollarService {
     }
 
     return out;
+  }
+
+  /**
+   * Enriches collar entities with DynamoDB activity data
+   * Fetches latest location and status for all collars and maps them
+   */
+  async enrichCollarsWithActivityData(collars: CollarEntity[]): Promise<CollarEntity[]> {
+    if (collars.length === 0) {
+      return [];
+    }
+
+    const imeis = collars.map((collar) => collar.imei);
+    const dynamoDataMap = await this.getMultipleCollarLastActivity(imeis);
+
+    return this.mapCollarsWithActivityData(collars, dynamoDataMap);
+  }
+
+  /**
+   * Maps collar(s) with DynamoDB activity data
+   * Can handle either a single collar or an array of collars
+   */
+  private mapCollarsWithActivityData(
+    collar: CollarEntity,
+    dynamoData?: { latestLocation?: any; latestStatus?: any } | null
+  ): CollarEntity;
+
+  private mapCollarsWithActivityData(
+    collars: CollarEntity[],
+    dynamoDataMap: Map<number, { latestLocation?: any; latestStatus?: any }>
+  ): CollarEntity[];
+  
+  private mapCollarsWithActivityData(
+    collarsOrCollar: CollarEntity | CollarEntity[],
+    dynamoDataOrMap?: { latestLocation?: any; latestStatus?: any } | null | Map<number, { latestLocation?: any; latestStatus?: any }>
+  ): CollarEntity | CollarEntity[] {
+    // Handle array case
+    if (Array.isArray(collarsOrCollar)) {
+      const collars = collarsOrCollar;
+      const dynamoDataMap = dynamoDataOrMap as Map<number, { latestLocation?: any; latestStatus?: any }>;
+      
+      return collars.map((collar) => {
+        const dynamoData = dynamoDataMap.get(Number(collar.imei));
+        return this.mapCollarsWithActivityData(collar, dynamoData) as CollarEntity;
+      });
+    }
+    
+    // Handle single collar case
+    const collar = collarsOrCollar;
+    const dynamoData = dynamoDataOrMap as { latestLocation?: any; latestStatus?: any } | null | undefined;
+    
+    return {
+      ...collar,
+      latestLocation: dynamoData?.latestLocation,
+      latestStatus: dynamoData?.latestStatus,
+    } as CollarEntity;
   }
 }
