@@ -137,11 +137,13 @@ export class SheepCollarService extends BaseService {
   }
 
   async findAll(id: string) {
-    const associations = await this.sheepCollarRepository.find({
-      where: [{ collarId: id }, { sheepId: id }],
-      order: { assignedFrom: 'DESC' },
-      relations: ['collar', 'sheep'],
-    });
+    const associations = await this.sheepCollarRepository
+      .createQueryBuilder('sc')
+      .innerJoinAndSelect('sc.collar', 'collar', 'collar.deletedAt IS NULL')
+      .innerJoinAndSelect('sc.sheep', 'sheep', 'sheep.deletedAt IS NULL')
+      .where('(sc.collarId = :id)', { id })
+      .orderBy('sc.assignedFrom', 'DESC')
+      .getMany();
 
     return associations.map((association) =>
       this.toDto(SheepCollarDto, association, {
