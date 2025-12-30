@@ -16,6 +16,7 @@ import { SheepCollarModule } from './sheep-collar/sheep-collar.module';
 import { PaddocksModule } from './paddocks/paddocks.module';
 import { BreedsModule } from './breeds/breeds.module';
 import { ReportsModule } from './reports/reports.module';
+import { UserModule } from './user/user.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { ReportsModule } from './reports/reports.module';
     EstablishmentsModule,
     SheepModule,
     AuthModule,
+    UserModule,
     SheepCollarModule,
     PaddocksModule,
     BreedsModule,

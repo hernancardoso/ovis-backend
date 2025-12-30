@@ -152,6 +152,8 @@ export class UserManagementService {
       // Check if user is in admin group
       const isAdmin = await this.isUserInAdminGroup(email);
 
+      const language = result.UserAttributes?.find((attr) => attr.Name === 'custom:language')?.Value || 'es';
+
       return {
         userId: result.Username,
         email: result.UserAttributes?.find((attr) => attr.Name === 'email')?.Value,
@@ -159,6 +161,7 @@ export class UserManagementService {
         establishmentIds,
         isAdmin,
         enabled: result.Enabled,
+        language,
         userStatus: result.UserStatus,
         createdAt: result.UserCreateDate,
         updatedAt: result.UserLastModifiedDate,
@@ -241,6 +244,13 @@ export class UserManagementService {
         attributes.push({
           Name: 'name',
           Value: updateUserDto.name,
+        });
+      }
+
+      if (updateUserDto.language !== undefined) {
+        attributes.push({
+          Name: 'custom:language',
+          Value: updateUserDto.language,
         });
       }
 
