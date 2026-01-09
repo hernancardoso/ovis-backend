@@ -1,205 +1,172 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { GlueClient, GetTableCommand, GetTableCommandOutput, UpdateTableCommand } from '@aws-sdk/client-glue';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  GlueClient,
+  GetTableCommand,
+  UpdateTableCommand,
+  Column,
+  TableInput,
+} from '@aws-sdk/client-glue';
 
 @Injectable()
 export class GlueDataService {
-  private readonly logger = new Logger(GlueDataService.name);
-  private readonly glueClient: GlueClient;
+  private readonly glue: GlueClient;
+
   private readonly databaseName = 'iot_raw';
-  private readonly tableName = 'collar_messages_parquet';
+  private readonly tables = ['collar_messages', 'collar_messages_firehose'];
+  
 
   constructor() {
-    const awsConfig = {
-      region: process.env.AWS_REGION || 'us-east-1',
+    this.glue = new GlueClient({
+      region: 'us-east-1',
       credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY || '',
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-        sessionToken: process.env.AWS_SESSION_TOKEN,
+        accessKeyId: process.env.AWS_ACCESS_KEY ?? '',
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? '',
+        ...(process.env.AWS_SESSION_TOKEN && { sessionToken: process.env.AWS_SESSION_TOKEN }),
       },
-    };
+    });
+  }
 
-    this.glueClient = new GlueClient(awsConfig);
+  private async getTable(tableName: string) {
+    try {
+      const res = await this.glue.send(
+        new GetTableCommand({
+          DatabaseName: this.databaseName,
+          Name: tableName,
+        }),
+      );
+
+      return res.Table;
+    } catch (error: any) {
+      if (error.name === 'EntityNotFoundException') {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  private async updateTable(tableName: string, tableInput: TableInput) {
+    await this.glue.send(
+      new UpdateTableCommand({
+        DatabaseName: this.databaseName,
+        TableInput: tableInput,
+      }),
+    );
   }
 
   async getTableSchema() {
     try {
-      const command = new GetTableCommand({
-        DatabaseName: this.databaseName,
-        Name: this.tableName,
-      });
-
-      const response: GetTableCommandOutput = await this.glueClient.send(command);
-      const table = response.Table;
-
+      const table = await this.getTable(this.tables[0]);
+      
       if (!table) {
-        throw new Error('Table not found');
+        return {
+          databaseName: this.databaseName,
+          tableName: this.tables[0],
+          columns: [],
+          location: '',
+        };
       }
 
-      // Extract column information
-      const columns = table.StorageDescriptor?.Columns?.map((col) => ({
-        name: col.Name,
-        type: col.Type,
+      const sd = table.StorageDescriptor;
+      const columns = (sd?.Columns ?? []).map((col) => ({
+        name: col.Name ?? '',
+        type: col.Type ?? '',
         comment: col.Comment,
-      })) || [];
+      }));
 
       return {
-        databaseName: table.DatabaseName,
-        tableName: table.Name,
+        databaseName: this.databaseName,
+        tableName: table.Name ?? this.tables[0],
         columns,
-        location: table.StorageDescriptor?.Location,
-        inputFormat: table.StorageDescriptor?.InputFormat,
-        outputFormat: table.StorageDescriptor?.OutputFormat,
-        serdeInfo: table.StorageDescriptor?.SerdeInfo,
+        location: sd?.Location ?? '',
+        inputFormat: sd?.InputFormat,
+        outputFormat: sd?.OutputFormat,
+        serdeInfo: sd?.SerdeInfo,
       };
-    } catch (error) {
-      this.logger.error(`Error getting table schema: ${error.message}`, error.stack);
-      throw error;
+    } catch (err) {
+      console.error(err);
+      throw new InternalServerErrorException('Failed to get table schema from Glue');
     }
   }
 
   async addColumn(name: string, type: string, comment?: string) {
     try {
-      // First, get the current table definition
-      const getCommand = new GetTableCommand({
-        DatabaseName: this.databaseName,
-        Name: this.tableName,
-      });
+      for (const tableName of this.tables) {
+        const table = await this.getTable(tableName);
+        if (!table) continue;
 
-      const response = await this.glueClient.send(getCommand);
-      const table = response.Table;
+        const sd = table.StorageDescriptor;
+        if (!sd) continue;
 
-      if (!table || !table.StorageDescriptor) {
-        throw new Error('Table not found or invalid');
-      }
+        const columns = sd.Columns ?? [];
 
-      // Check if column already exists
-      const existingColumns = table.StorageDescriptor.Columns || [];
-      const columnExists = existingColumns.some((col) => col.Name === name);
-      if (columnExists) {
-        throw new Error(`Column ${name} already exists`);
-      }
+        if (columns.some((c) => c.Name === name)) {
+          continue; // ya existe → skip
+        }
 
-      // Add the new column
-      const newColumns = [
-        ...existingColumns,
-        {
+        const newColumn: Column = {
           Name: name,
           Type: type,
           Comment: comment,
-        },
-      ];
+        };
 
-      // Prepare TableInput with all required fields
-      const tableInput: any = {
-        Name: table.Name,
-        StorageDescriptor: {
-          ...table.StorageDescriptor,
-          Columns: newColumns,
-        },
-      };
+        const updatedColumns = [...columns, newColumn];
 
-      if (table.PartitionKeys) {
-        tableInput.PartitionKeys = table.PartitionKeys;
-      }
-      if (table.Parameters) {
-        tableInput.Parameters = table.Parameters;
-      }
-      if (table.TableType) {
-        tableInput.TableType = table.TableType;
-      }
-      if (table.Description) {
-        tableInput.Description = table.Description;
-      }
-      if (table.Owner) {
-        tableInput.Owner = table.Owner;
+        const tableInput: TableInput = {
+          Name: table.Name,
+          TableType: table.TableType,
+          Parameters: table.Parameters,
+          PartitionKeys: table.PartitionKeys,
+          StorageDescriptor: {
+            ...sd,
+            Columns: updatedColumns,
+          },
+        };
+
+        await this.updateTable(tableName, tableInput);
       }
 
-      // Update the table with the new column
-      const updateCommand = new UpdateTableCommand({
-        DatabaseName: this.databaseName,
-        TableInput: tableInput,
-      });
-
-      await this.glueClient.send(updateCommand);
-
-      this.logger.log(`Column ${name} added successfully`);
-
-      return {
-        success: true,
-        message: `Column ${name} added successfully`,
-      };
-    } catch (error) {
-      this.logger.error(`Error adding column: ${error.message}`, error.stack);
-      throw error;
+      return { ok: true };
+    } catch (err) {
+      console.error(err);
+      throw new InternalServerErrorException('Failed to add column to Glue tables');
     }
   }
 
   async deleteColumn(columnName: string) {
     try {
-      // First, get the current table definition
-      const getCommand = new GetTableCommand({
-        DatabaseName: this.databaseName,
-        Name: this.tableName,
-      });
+      for (const tableName of this.tables) {
+        const table = await this.getTable(tableName);
+        if (!table) continue;
 
-      const response = await this.glueClient.send(getCommand);
-      const table = response.Table;
+        const sd = table.StorageDescriptor;
+        if (!sd) continue;
 
-      if (!table || !table.StorageDescriptor) {
-        throw new Error('Table not found or invalid');
+        const columns = sd.Columns ?? [];
+
+        const filtered = columns.filter((c) => c.Name !== columnName);
+
+        if (filtered.length === columns.length) {
+          continue; // no existía → skip
+        }
+
+        const tableInput: TableInput = {
+          Name: table.Name,
+          TableType: table.TableType,
+          Parameters: table.Parameters,
+          PartitionKeys: table.PartitionKeys,
+          StorageDescriptor: {
+            ...sd,
+            Columns: filtered,
+          },
+        };
+
+        await this.updateTable(tableName, tableInput);
       }
 
-      // Remove the column
-      const existingColumns = table.StorageDescriptor.Columns || [];
-      const filteredColumns = existingColumns.filter((col) => col.Name !== columnName);
-
-      if (filteredColumns.length === existingColumns.length) {
-        throw new Error(`Column ${columnName} not found`);
-      }
-
-      // Prepare TableInput with all required fields
-      const tableInput: any = {
-        Name: table.Name,
-        StorageDescriptor: {
-          ...table.StorageDescriptor,
-          Columns: filteredColumns,
-        },
-      };
-
-      if (table.PartitionKeys) {
-        tableInput.PartitionKeys = table.PartitionKeys;
-      }
-      if (table.Parameters) {
-        tableInput.Parameters = table.Parameters;
-      }
-      if (table.TableType) {
-        tableInput.TableType = table.TableType;
-      }
-      if (table.Description) {
-        tableInput.Description = table.Description;
-      }
-      if (table.Owner) {
-        tableInput.Owner = table.Owner;
-      }
-
-      // Update the table without the column
-      const updateCommand = new UpdateTableCommand({
-        DatabaseName: this.databaseName,
-        TableInput: tableInput,
-      });
-
-      await this.glueClient.send(updateCommand);
-
-      this.logger.log(`Column ${columnName} deleted successfully`);
-
-      return {
-        success: true,
-        message: `Column ${columnName} deleted successfully`,
-      };
-    } catch (error) {
-      this.logger.error(`Error deleting column: ${error.message}`, error.stack);
-      throw error;
+      return { ok: true };
+    } catch (err) {
+      console.error(err);
+      throw new InternalServerErrorException('Failed to delete column from Glue tables');
     }
   }
 }
-
