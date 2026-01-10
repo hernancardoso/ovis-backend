@@ -18,6 +18,7 @@ import { BreedsModule } from './breeds/breeds.module';
 import { ReportsModule } from './reports/reports.module';
 import { UserModule } from './user/user.module';
 import { GlueDataModule } from './glue-data/glue-data.module';
+import { ExportsModule } from './exports/exports.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { GlueDataModule } from './glue-data/glue-data.module';
     BreedsModule,
     ReportsModule,
     GlueDataModule,
+    ExportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
