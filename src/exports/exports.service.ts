@@ -237,13 +237,16 @@ export class ExportsService {
     let query: string;
     let mode: ExportMode;
 
+    const orderByClause = 'ORDER BY timestamp ASC';
+
     if (shouldUseSingleFileQuery) {
       mode = 'QUERY_RESULTS';
       query = `SELECT ${columns.length > 0 ? nullHandledColumns : columnList}
 FROM ${this.databaseName}.${this.tableName}
 WHERE (${partitionFilter})
   ${imeiFilter}
-  ${timestampFilter}`;
+  ${timestampFilter}
+  ${orderByClause}`;
     } else {
       mode = 'UNLOAD';
       const withClause =
@@ -257,6 +260,7 @@ WHERE (${partitionFilter})
   WHERE (${partitionFilter})
     ${imeiFilter}
     ${timestampFilter}
+  ${orderByClause}
 )
 TO '${unloadS3Path}'
 WITH (
