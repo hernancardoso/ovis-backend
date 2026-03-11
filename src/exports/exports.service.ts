@@ -191,7 +191,10 @@ export class ExportsService {
       ResponseContentType: this.getContentType(format),
     });
 
-    return getSignedUrl(this.s3, getObjectCommand, { expiresIn: 3600 });
+    // Type assertion needed when @aws-sdk/client-s3 and @aws-sdk/s3-request-presigner versions differ
+    return getSignedUrl(this.s3 as Parameters<typeof getSignedUrl>[0], getObjectCommand, {
+      expiresIn: 3600,
+    });
   }
 
   async createExport(createExportDto: CreateExportDto) {
