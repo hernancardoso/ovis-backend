@@ -191,10 +191,13 @@ export class ExportsService {
       ResponseContentType: this.getContentType(format),
     });
 
-    // Type assertion needed when @aws-sdk/client-s3 and @aws-sdk/s3-request-presigner versions differ
-    return getSignedUrl(this.s3 as Parameters<typeof getSignedUrl>[0], getObjectCommand, {
-      expiresIn: 3600,
-    });
+    // Double assertion needed: CI gets duplicate @smithy/types from different AWS packages, so
+    // S3Client and GetObjectCommand are not assignable to presigner's expected types.
+    return getSignedUrl(
+      this.s3 as unknown as Parameters<typeof getSignedUrl>[0],
+      getObjectCommand as unknown as Parameters<typeof getSignedUrl>[1],
+      { expiresIn: 3600 }
+    );
   }
 
   async createExport(createExportDto: CreateExportDto) {
