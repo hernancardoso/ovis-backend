@@ -19,6 +19,8 @@ import { ReportsModule } from './reports/reports.module';
 import { UserModule } from './user/user.module';
 import { GlueDataModule } from './glue-data/glue-data.module';
 import { ExportsModule } from './exports/exports.module';
+import { FirmwareModule } from './firmware/firmware.module';
+import { FotaModule } from './fota/fota.module';
 
 @Module({
   imports: [
@@ -39,6 +41,8 @@ import { ExportsModule } from './exports/exports.module';
     ReportsModule,
     GlueDataModule,
     ExportsModule,
+    FirmwareModule,
+    FotaModule,
   ],
   controllers: [AppController],
   providers: [AppService],

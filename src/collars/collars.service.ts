@@ -1,4 +1,11 @@
-import { BadRequestException, Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  forwardRef,
+} from '@nestjs/common';
 import { CreateCollarDto } from './dto/create-collar.dto';
 import { UpdateCollarDto } from './dto/update-collar.dto';
 import { CollarEntity } from './entities/collar.entity';
@@ -30,13 +37,15 @@ export class CollarsService extends BaseService {
   async create(establishmentId: EstablishmentEntity['id'], createCollarDto: CreateCollarDto) {
     try {
       const { sheepId, ...collarData } = createCollarDto;
-      
+
       const existingCollar = await this.collarRepository.findOne({
         where: { imei: createCollarDto.imei },
       });
-      
+
       if (existingCollar) {
-        throw new BadRequestException(`El IMEI ${createCollarDto.imei} ya está registrado en el sistema`);
+        throw new BadRequestException(
+          `El IMEI ${createCollarDto.imei} ya está registrado en el sistema`
+        );
       }
 
       const collar = this.collarRepository.create(collarData);
@@ -47,7 +56,9 @@ export class CollarsService extends BaseService {
       return await this.findOne(savedCollar.id);
     } catch (e: any) {
       Logger.error(e);
-      throw new BadRequestException('Error al crear el collar. Verifique que el IMEI no esté duplicado.');
+      throw new BadRequestException(
+        'Error al crear el collar. Verifique que el IMEI no esté duplicado.'
+      );
     }
   }
 
@@ -57,8 +68,8 @@ export class CollarsService extends BaseService {
     updateCollarDto: UpdateCollarDto
   ) {
     try {
-      const collar = await this.findOne(id) as CollarEntity;
-      const {sheepId: newSheepId, ...mergeCollar} = updateCollarDto;
+      const collar = (await this.findOne(id)) as CollarEntity;
+      const { sheepId: newSheepId, ...mergeCollar } = updateCollarDto;
 
       await this.sheepCollarService.handleAssociation(collar, newSheepId);
 
@@ -66,17 +77,18 @@ export class CollarsService extends BaseService {
         const existingCollar = await this.collarRepository.findOne({
           where: { imei: mergeCollar.imei },
         });
-        
+
         if (existingCollar && existingCollar.id !== id) {
-          throw new BadRequestException(`El IMEI ${mergeCollar.imei} ya está registrado en el sistema`);
+          throw new BadRequestException(
+            `El IMEI ${mergeCollar.imei} ya está registrado en el sistema`
+          );
         }
       }
-      
+
       const updatedCollar = this.collarRepository.merge(collar, mergeCollar);
       const savedCollar = await this.collarRepository.save(updatedCollar);
 
       return await this.findOne(savedCollar.id);
-      
     } catch (e) {
       Logger.debug(e);
       throw new Error('Error al actualizar la oveja');
@@ -84,9 +96,7 @@ export class CollarsService extends BaseService {
   }
 
   async findOne(id: string) {
-    const collar = await this.buildCollarQueryBuilder()
-      .where('collar.id = :id', { id })
-      .getOne();
+    const collar = await this.buildCollarQueryBuilder().where('collar.id = :id', { id }).getOne();
 
     if (!collar) throw new Error('Collar not found');
 
@@ -106,7 +116,6 @@ export class CollarsService extends BaseService {
     return this.dynamoDBCollarService.enrichCollarsWithActivityData(collars);
   }
 
-
   async remove(id: string) {
     const collar = await this.findOne(id);
 
@@ -124,20 +133,25 @@ export class CollarsService extends BaseService {
     return this.dynamoDBCollarService.enrichCollarsWithActivityData(collars);
   }
 
+  async findOneInEstablishment(
+    establishmentId: EstablishmentEntity['id'],
+    id: string
+  ): Promise<CollarEntity> {
+    const collar = await this.collarRepository.findOne({
+      where: { id, establishmentId },
+    });
+    if (!collar) throw new NotFoundException('Collar not found');
+    return collar;
+  }
+
   getInitialInfo(imei: number, limit: number) {
     return this.dynamoDBCollarService.getCollarInitialInfo(imei, limit);
   }
 
-
   private buildCollarQueryBuilder() {
     return this.collarRepository
       .createQueryBuilder('collar')
-      .leftJoin(
-        SheepCollarEntity,
-        'sc',
-        'sc.collarId = collar.id AND sc.assignedUntil IS NULL'
-      )
+      .leftJoin(SheepCollarEntity, 'sc', 'sc.collarId = collar.id AND sc.assignedUntil IS NULL')
       .leftJoinAndMapOne('collar.sheep', 'sheep', 'sheep', 'sheep.id = sc.sheepId');
   }
-
 }

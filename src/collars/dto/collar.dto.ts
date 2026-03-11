@@ -30,4 +30,7 @@ export class CollarDto {
 
   @Expose()
   updatedAt: Date;
+
+  @Expose()
+  firmwareVersion?: string;
 }

@@ -6,6 +6,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { EstablishmentsModule } from 'src/establishments/establishments.module';
 import { SheepCollarModule } from 'src/sheep-collar/sheep-collar.module';
 import { DynamoDBCollarService } from './services/dynamodb-collar.service';
+import { IotShadowService } from './services/iot-shadow.service';
 
 @Module({
   imports: [
@@ -14,7 +15,7 @@ import { DynamoDBCollarService } from './services/dynamodb-collar.service';
     forwardRef(() => SheepCollarModule),
   ],
   controllers: [CollarsController],
-  providers: [CollarsService, DynamoDBCollarService],
+  providers: [CollarsService, DynamoDBCollarService, IotShadowService],
   exports: [CollarsService, DynamoDBCollarService],
 })
 export class CollarsModule {}
