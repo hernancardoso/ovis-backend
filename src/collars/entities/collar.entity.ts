@@ -52,4 +52,7 @@ export class CollarEntity extends TimestampedEntity {
   @OneToMany(() => SheepCollarEntity, (sheepCollar) => sheepCollar.collar)
   sheep_history: SheepCollarEntity[];
 
+  @Column({ type: 'varchar', length: 64, default: '1.0' })
+  firmwareVersion: string;
+
 }
