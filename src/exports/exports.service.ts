@@ -1,4 +1,9 @@
-import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   AthenaClient,
   StartQueryExecutionCommand,
@@ -102,6 +107,31 @@ export class ExportsService {
     return partitions;
   }
 
+  private resolveTimestampRange(createExportDto: CreateExportDto) {
+    const { fromTimestamp, toTimestamp } = createExportDto;
+    const hasValidFromTimestamp =
+      typeof fromTimestamp === 'number' && Number.isFinite(fromTimestamp);
+    const hasValidToTimestamp = typeof toTimestamp === 'number' && Number.isFinite(toTimestamp);
+
+    if (!hasValidFromTimestamp || !hasValidToTimestamp) {
+      throw new BadRequestException('Invalid export range');
+    }
+
+    if (fromTimestamp > toTimestamp) {
+      throw new BadRequestException('Invalid export range');
+    }
+
+    const partitionFromDate = moment.utc(fromTimestamp).startOf('day');
+    const partitionToDate = moment.utc(toTimestamp).startOf('day');
+
+    return {
+      fromTimestamp,
+      toTimestamp,
+      partitionFromDate,
+      partitionToDate,
+    };
+  }
+
   private calculateCost(dataScannedBytes: number, isEstimated: boolean = false) {
     if (!dataScannedBytes || dataScannedBytes === 0) {
       return null;
@@ -202,35 +232,16 @@ export class ExportsService {
 
   async createExport(createExportDto: CreateExportDto) {
     const jobId = randomUUID();
-    const {
-      collarImeis,
-      from,
-      to,
-      fromTime,
-      toTime,
-      columns,
-      format,
-      singleFile = false,
-    } = createExportDto;
-
-    const fromDate = moment(from);
-    const toDate = moment(to);
-    const partitions = this.buildPartitions(fromDate, toDate);
+    const { collarImeis, columns, format, singleFile = false } = createExportDto;
+    const { fromTimestamp, toTimestamp, partitionFromDate, partitionToDate } =
+      this.resolveTimestampRange(createExportDto);
+    const partitions = this.buildPartitions(partitionFromDate, partitionToDate);
     const columnList = columns.length > 0 ? columns.join(', ') : '*';
     const shouldUseSingleFileQuery = format === 'CSV' && singleFile;
 
     const imeiFilter = collarImeis.length > 0 ? `AND imei IN (${collarImeis.join(', ')})` : '';
 
-    let timestampFilter = '';
-    if (fromTime || toTime) {
-      const fromTimestamp = fromTime
-        ? moment(`${from} ${fromTime}`).valueOf()
-        : fromDate.startOf('day').valueOf();
-      const toTimestamp = toTime
-        ? moment(`${to} ${toTime}`).valueOf()
-        : toDate.endOf('day').valueOf();
-      timestampFilter = `AND timestamp >= ${fromTimestamp} AND timestamp <= ${toTimestamp}`;
-    }
+    const timestampFilter = `AND timestamp >= ${fromTimestamp} AND timestamp <= ${toTimestamp}`;
 
     const partitionFilter = partitions.join(' OR ');
     const unloadS3Path = `s3://${this.exportsBucket}/exports/${jobId}/`;

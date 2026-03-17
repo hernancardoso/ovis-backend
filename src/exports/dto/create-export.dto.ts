@@ -1,25 +1,15 @@
-import { IsArray, IsString, IsOptional, IsDateString, IsNumber, IsIn, IsBoolean } from 'class-validator';
+import { IsArray, IsString, IsOptional, IsNumber, IsIn, IsBoolean } from 'class-validator';
 
 export class CreateExportDto {
   @IsArray()
   @IsNumber({}, { each: true })
   collarImeis: number[];
 
-  @IsString()
-  @IsDateString()
-  from: string;
+  @IsNumber()
+  fromTimestamp: number;
 
-  @IsString()
-  @IsDateString()
-  to: string;
-
-  @IsOptional()
-  @IsString()
-  fromTime?: string;
-
-  @IsOptional()
-  @IsString()
-  toTime?: string;
+  @IsNumber()
+  toTimestamp: number;
 
   @IsArray()
   @IsString({ each: true })
