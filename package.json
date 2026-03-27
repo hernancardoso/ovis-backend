@@ -1,6 +1,6 @@
 {
   "name": "ovis-backend",
-  "version": "4.1.0",
+  "version": "4.2.0",
   "description": "",
   "author": "",
   "private": true,
@@ -12,6 +12,7 @@
     "start:dev": "NODE_ENV=development nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
+    "script:backfill-firehose": "ts-node -r tsconfig-paths/register scripts/backfill-report-data-to-firehose.ts",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -23,6 +24,7 @@
     "@aws-sdk/client-athena": "^3.958.0",
     "@aws-sdk/client-cognito-identity-provider": "^3.714.0",
     "@aws-sdk/client-dynamodb": "^3.687.0",
+    "@aws-sdk/client-firehose": "^3.1019.0",
     "@aws-sdk/client-glue": "^3.958.0",
     "@aws-sdk/client-iot": "^3.966.0",
     "@aws-sdk/client-iot-data-plane": "^3.966.0",

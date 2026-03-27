@@ -1,9 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { CreateReportDto } from './dto/create-report.dto';
-import { UpdateReportDto } from './dto/update-report.dto';
 import { GetReportDTO } from './dto/get-report.dto';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { parseKeyValueLines } from './utils/parse-key-value-lines.util';
 
 @Injectable()
 export class ReportsService {
@@ -60,7 +59,7 @@ export class ReportsService {
         const items: any = await this.dynamoDb.send(new QueryCommand(params));
 
         items.Items.forEach((item) => {
-          const { x, y, z } = strToObject(item.data);
+          const { x, y, z } = parseKeyValueLines(item.data);
           reports.push({
             timestamp: item.timestamp,
             x,
@@ -77,32 +76,4 @@ export class ReportsService {
       console.error('Error:', error.message);
     }
   }
-}
-
-// Utility function to parse the string data into an object
-function strToObject(str): any {
-  if (!str) return {};
-  const lines = str.trim().split('\n');
-  const result = {};
-
-  lines.forEach((line) => {
-    if (!line.length || line === '') return;
-    const values = line.split(':');
-    if (values.length !== 2) return;
-
-    const key = values[0];
-    const value = values[1];
-    if (['la', 'lo', 'e', 'tg', 'alt'].includes(key)) {
-      if (value.includes(',')) {
-        const values = value.split(',').map((v) => parseFloat(v) || 0.0);
-        result[key] = values;
-      } else {
-        result[key] = [parseFloat(value)];
-      }
-    } else {
-      result[key] = value;
-    }
-  });
-
-  return result;
 }
