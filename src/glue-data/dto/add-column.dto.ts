@@ -12,5 +12,8 @@ export class AddColumnDto {
   @IsString()
   @IsOptional()
   comment?: string;
-}
 
+  @IsString()
+  @IsOptional()
+  category?: string;
+}
