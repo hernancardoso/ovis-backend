@@ -18,13 +18,16 @@ import {
   PutObjectCommand,
   HeadObjectCommand,
   DeleteObjectCommand,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
+  CompleteMultipartUploadCommand,
+  AbortMultipartUploadCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 import { CreateExportDto } from './dto/create-export.dto';
 import moment from 'moment';
-import { PassThrough, Readable } from 'stream';
-import { once } from 'events';
+import { Readable } from 'stream';
 
 type ExportFormat = 'CSV' | 'JSON';
 type ExportMode = 'UNLOAD' | 'QUERY_RESULTS';
@@ -60,6 +63,7 @@ export class ExportsService {
   private readonly athenaWorkGroup = process.env.AWS_ATHENA_WORKGROUP || 'primary';
   private readonly athenaOutputLocation =
     process.env.AWS_ATHENA_OUTPUT_LOCATION || `s3://${this.exportsBucket}/athena-results/`;
+  private readonly multipartUploadPartSizeBytes = 8 * 1024 * 1024;
 
   private readonly jobStore = new Map<string, ExportJob>();
 
@@ -71,6 +75,7 @@ export class ExportsService {
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? '',
         ...(process.env.AWS_SESSION_TOKEN && { sessionToken: process.env.AWS_SESSION_TOKEN }),
       },
+      requestChecksumCalculation: 'WHEN_REQUIRED' as const,
     };
 
     this.athena = new AthenaClient(awsConfig);
@@ -200,25 +205,6 @@ export class ExportsService {
       toTimestamp,
       partitionFromDate,
       partitionToDate,
-    };
-  }
-
-  private calculateCost(dataScannedBytes: number, isEstimated: boolean = false) {
-    if (!dataScannedBytes || dataScannedBytes === 0) {
-      return null;
-    }
-
-    const dataScannedGB = dataScannedBytes / (1024 * 1024 * 1024);
-    const dataScannedTB = dataScannedGB / 1024;
-    const costPerTB = 5;
-    const costUSD = dataScannedTB * costPerTB;
-
-    return {
-      dataScannedBytes,
-      dataScannedGB: parseFloat(dataScannedGB.toFixed(4)),
-      dataScannedTB: parseFloat(dataScannedTB.toFixed(6)),
-      costUSD: parseFloat(costUSD.toFixed(4)),
-      isEstimated,
     };
   }
 
@@ -383,56 +369,115 @@ export class ExportsService {
       .sort((a, b) => (a.Key || '').localeCompare(b.Key || ''));
   }
 
-  private async writeChunk(target: PassThrough, chunk: Buffer | Uint8Array | string) {
-    const buffer =
-      typeof chunk === 'string'
-        ? Buffer.from(chunk)
-        : Buffer.isBuffer(chunk)
-          ? chunk
-          : Buffer.from(chunk);
-
-    if (!target.write(buffer)) {
-      await once(target, 'drain');
+  private normalizeChunk(chunk: Buffer | Uint8Array | string) {
+    if (typeof chunk === 'string') {
+      return Buffer.from(chunk);
     }
 
-    return buffer;
-  }
-
-  private async pipeReadableToTarget(body: Readable, target: PassThrough) {
-    let bytesWritten = 0;
-    let endedWithNewline = false;
-
-    for await (const chunk of body) {
-      const buffer = await this.writeChunk(target, chunk as Buffer | Uint8Array | string);
-      bytesWritten += buffer.length;
-      endedWithNewline = buffer.length > 0 && buffer[buffer.length - 1] === 0x0a;
-    }
-
-    return {
-      bytesWritten,
-      endedWithNewline,
-    };
+    return Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
   }
 
   private async mergeUnloadJsonPartsToJsonl(jobId: string, job: ExportJob) {
     const targetKey = this.getMergedJsonlKey(jobId);
     const outputFileName = this.buildFriendlyFileName(jobId, job, 0, 1);
     const dataObjects = await this.listUnloadDataObjects(jobId);
-
-    const outputStream = new PassThrough();
-    const uploadPromise = this.s3.send(
-      new PutObjectCommand({
-        Bucket: this.exportsBucket,
-        Key: targetKey,
-        Body: outputStream,
-        ContentType: this.getContentType(job.format, true),
-      })
-    );
+    let uploadId: string | undefined;
 
     try {
+      if (dataObjects.length === 0) {
+        await this.s3.send(
+          new PutObjectCommand({
+            Bucket: this.exportsBucket,
+            Key: targetKey,
+            Body: '',
+            ContentType: this.getContentType(job.format, true),
+          })
+        );
+
+        job.postProcessing = {
+          type: 'JSONL_MERGE',
+          state: 'SUCCEEDED',
+          outputFileName,
+          s3Key: targetKey,
+        };
+
+        return;
+      }
+
+      const createMultipartResponse = await this.s3.send(
+        new CreateMultipartUploadCommand({
+          Bucket: this.exportsBucket,
+          Key: targetKey,
+          ContentType: this.getContentType(job.format, true),
+        })
+      );
+
+      uploadId = createMultipartResponse.UploadId;
+      if (!uploadId) {
+        throw new Error('Failed to create multipart upload for NDJSON export');
+      }
+
+      const completedParts: Array<{ ETag: string; PartNumber: number }> = [];
+      let partNumber = 1;
+      let pendingBuffers: Buffer[] = [];
+      let pendingLength = 0;
+      let previousObjectHadData = false;
+
+      const flushPending = async (force: boolean = false) => {
+        if (pendingLength === 0) {
+          return;
+        }
+
+        if (!force && pendingLength < this.multipartUploadPartSizeBytes) {
+          return;
+        }
+
+        const body = Buffer.concat(pendingBuffers, pendingLength);
+        const uploadPartResponse = await this.s3.send(
+          new UploadPartCommand({
+            Bucket: this.exportsBucket,
+            Key: targetKey,
+            UploadId: uploadId,
+            PartNumber: partNumber,
+            Body: body,
+            ContentLength: body.length,
+          })
+        );
+
+        if (!uploadPartResponse.ETag) {
+          throw new Error(`Missing ETag for NDJSON multipart part ${partNumber}`);
+        }
+
+        completedParts.push({
+          ETag: uploadPartResponse.ETag,
+          PartNumber: partNumber,
+        });
+
+        partNumber += 1;
+        pendingBuffers = [];
+        pendingLength = 0;
+      };
+
+      const pushBuffer = async (buffer: Buffer) => {
+        if (buffer.length === 0) {
+          return;
+        }
+
+        pendingBuffers.push(buffer);
+        pendingLength += buffer.length;
+
+        while (pendingLength >= this.multipartUploadPartSizeBytes) {
+          await flushPending(true);
+        }
+      };
+
       for (const obj of dataObjects) {
         const key = obj.Key;
         if (!key) continue;
+
+        if (previousObjectHadData) {
+          await pushBuffer(Buffer.from('\n'));
+        }
 
         const response = await this.s3.send(
           new GetObjectCommand({
@@ -446,17 +491,37 @@ export class ExportsService {
           continue;
         }
 
-        const { bytesWritten, endedWithNewline } = await this.pipeReadableToTarget(
-          body,
-          outputStream
-        );
-        if (bytesWritten > 0 && !endedWithNewline) {
-          await this.writeChunk(outputStream, '\n');
+        let bytesWritten = 0;
+        let endedWithNewline = false;
+
+        for await (const chunk of body) {
+          const buffer = this.normalizeChunk(chunk as Buffer | Uint8Array | string);
+          bytesWritten += buffer.length;
+          endedWithNewline = buffer.length > 0 && buffer[buffer.length - 1] === 0x0a;
+          await pushBuffer(buffer);
+        }
+
+        if (bytesWritten > 0) {
+          previousObjectHadData = true;
+
+          if (!endedWithNewline) {
+            await pushBuffer(Buffer.from('\n'));
+          }
         }
       }
 
-      outputStream.end();
-      await uploadPromise;
+      await flushPending(true);
+
+      await this.s3.send(
+        new CompleteMultipartUploadCommand({
+          Bucket: this.exportsBucket,
+          Key: targetKey,
+          UploadId: uploadId,
+          MultipartUpload: {
+            Parts: completedParts,
+          },
+        })
+      );
 
       job.postProcessing = {
         type: 'JSONL_MERGE',
@@ -465,16 +530,26 @@ export class ExportsService {
         s3Key: targetKey,
       };
     } catch (error: any) {
-      outputStream.destroy(error);
-      await uploadPromise.catch(() => undefined);
-      await this.s3
-        .send(
-          new DeleteObjectCommand({
-            Bucket: this.exportsBucket,
-            Key: targetKey,
-          })
-        )
-        .catch(() => undefined);
+      if (uploadId) {
+        await this.s3
+          .send(
+            new AbortMultipartUploadCommand({
+              Bucket: this.exportsBucket,
+              Key: targetKey,
+              UploadId: uploadId,
+            })
+          )
+          .catch(() => undefined);
+      } else {
+        await this.s3
+          .send(
+            new DeleteObjectCommand({
+              Bucket: this.exportsBucket,
+              Key: targetKey,
+            })
+          )
+          .catch(() => undefined);
+      }
 
       job.postProcessing = {
         type: 'JSONL_MERGE',
@@ -641,30 +716,7 @@ WITH (
             : queryExecution.ResultConfiguration?.OutputLocation
           : undefined;
 
-      let dataScannedBytes = queryExecution.Statistics?.DataScannedInBytes || 0;
-      let isEstimated = false;
-
-      if (
-        dataScannedBytes === 0 &&
-        athenaState === QueryExecutionState.SUCCEEDED &&
-        job.mode === 'UNLOAD'
-      ) {
-        try {
-          const totalFileSize = (await this.listUnloadDataObjects(jobId)).reduce(
-            (sum, obj) => sum + (obj.Size || 0),
-            0
-          );
-
-          if (totalFileSize > 0) {
-            dataScannedBytes = totalFileSize;
-            isEstimated = true;
-          }
-        } catch (error) {
-          // Ignore error, keep dataScannedBytes at 0
-        }
-      }
-
-      const cost = dataScannedBytes > 0 ? this.calculateCost(dataScannedBytes, isEstimated) : null;
+      const dataScannedBytes = queryExecution.Statistics?.DataScannedInBytes || 0;
 
       if (athenaState === QueryExecutionState.SUCCEEDED && this.requiresJsonSingleFileMerge(job)) {
         this.ensureJsonSingleFileMerge(jobId, job);
@@ -694,7 +746,6 @@ WITH (
         s3Path,
         error,
         postProcessing: job.postProcessing,
-        cost,
         statistics: {
           dataScannedBytes,
           executionTimeMs: queryExecution.Statistics?.TotalExecutionTimeInMillis,
