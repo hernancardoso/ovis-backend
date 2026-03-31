@@ -5,7 +5,6 @@ import { AppController } from './app.controller';
 import { CollarsModule } from './collars/collars.module';
 import { AppService } from './app.service';
 import { EstablishmentsModule } from './establishments/establishments.module';
-import { TypeOrmConfigModule } from './datasource/typeorm-config.module';
 import { SheepModule } from './sheep/sheep.module';
 import { AuthModule } from './auth/auth.module';
 import databaseConfig from './config/typeorm.config';
@@ -21,6 +20,7 @@ import { GlueDataModule } from './glue-data/glue-data.module';
 import { ExportsModule } from './exports/exports.module';
 import { FirmwareModule } from './firmware/firmware.module';
 import { FotaModule } from './fota/fota.module';
+import { ShadowParamsModule } from './shadow-params/shadow-params.module';
 
 @Module({
   imports: [
@@ -43,6 +43,7 @@ import { FotaModule } from './fota/fota.module';
     ExportsModule,
     FirmwareModule,
     FotaModule,
+    ShadowParamsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

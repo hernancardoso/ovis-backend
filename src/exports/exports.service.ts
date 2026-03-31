@@ -64,6 +64,7 @@ export class ExportsService {
   private readonly athenaOutputLocation =
     process.env.AWS_ATHENA_OUTPUT_LOCATION || `s3://${this.exportsBucket}/athena-results/`;
   private readonly multipartUploadPartSizeBytes = 8 * 1024 * 1024;
+  private readonly forceJsonSingleFileExports = true;
 
   private readonly jobStore = new Map<string, ExportJob>();
 
@@ -432,7 +433,7 @@ export class ExportsService {
           return;
         }
 
-        const body = Buffer.concat(pendingBuffers, pendingLength);
+        const body = Buffer.concat(pendingBuffers as any[], pendingLength);
         const uploadPartResponse = await this.s3.send(
           new UploadPartCommand({
             Bucket: this.exportsBucket,
@@ -594,7 +595,9 @@ export class ExportsService {
 
   async createExport(createExportDto: CreateExportDto) {
     const jobId = randomUUID();
-    const { collarImeis, columns, format, singleFile = false } = createExportDto;
+    const { collarImeis, columns } = createExportDto;
+    const format = this.forceJsonSingleFileExports ? 'JSON' : createExportDto.format;
+    const singleFile = this.forceJsonSingleFileExports ? true : createExportDto.singleFile ?? false;
     const glueColumnTypes = columns.length > 0 ? await this.getGlueColumnTypes() : {};
     const { fromTimestamp, toTimestamp, partitionFromDate, partitionToDate } =
       this.resolveTimestampRange(createExportDto);

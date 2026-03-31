@@ -1,4 +1,4 @@
-import { forwardRef, Inject, Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, BadRequestException } from '@nestjs/common';
 import { CreatePaddockDto } from './dto/create-paddock.dto';
 import { UpdatePaddockDto } from './dto/update-paddock.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -99,7 +99,7 @@ export class PaddocksService {
       relations: ['sheep'],
     });
     if (paddock.sheep && paddock.sheep.length > 0) {
-      throw new Error('No se puede borrar el corral porque tiene ovejas asociadas');
+      throw new BadRequestException('No se puede borrar el corral porque tiene ovejas asociadas');
     }
 
     const result = await this.paddockRepository.softDelete({ id });
