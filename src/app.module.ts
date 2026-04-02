@@ -21,6 +21,7 @@ import { ExportsModule } from './exports/exports.module';
 import { FirmwareModule } from './firmware/firmware.module';
 import { FotaModule } from './fota/fota.module';
 import { ShadowParamsModule } from './shadow-params/shadow-params.module';
+import { ExportBySheepModule } from './export-by-sheep/export-by-sheep.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { ShadowParamsModule } from './shadow-params/shadow-params.module';
     FirmwareModule,
     FotaModule,
     ShadowParamsModule,
+    ExportBySheepModule,
   ],
   controllers: [AppController],
   providers: [AppService],

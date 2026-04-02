@@ -1,4 +1,11 @@
-import { forwardRef, Inject, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { CreateSheepDto } from './dto/create-sheep.dto';
 import { UpdateSheepDto } from './dto/update-sheep.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -62,7 +69,6 @@ export class SheepService extends BaseService {
 
       await this.sheepRepository.update(id, { paddockId: newPaddockId as any, ...mergeSheep });
       return await this.findOne(id);
-
     } catch (e) {
       Logger.debug(e);
       throw new Error('Error al actualizar la oveja');
@@ -82,23 +88,23 @@ export class SheepService extends BaseService {
       .where('sheep.paddockId IS NULL')
       .getMany();
 
-    const allSheepIds = [...sheepIds, ...sheepWithoutPaddock.map(s => s.id)];
+    const allSheepIds = [...sheepIds, ...sheepWithoutPaddock.map((s) => s.id)];
     const uniqueSheepIds = [...new Set(allSheepIds)];
 
     return await this.findByIds(uniqueSheepIds);
   }
 
+  async findAllAcrossEstablishments(filter?: SheepFilterDto) {
+    return this.buildSheepQueryBuilder().getMany();
+  }
+
   async findByIds(ids: string[]): Promise<SheepEntity[]> {
     if (ids.length === 0) return [];
-    return await this.buildSheepQueryBuilder()
-      .where('sheep.id IN (:...ids)', { ids })
-      .getMany();
+    return await this.buildSheepQueryBuilder().where('sheep.id IN (:...ids)', { ids }).getMany();
   }
 
   async findOne(id: SheepEntity['id']) {
-    const sheep = await this.buildSheepQueryBuilder()
-      .where('sheep.id = :id', { id })
-      .getOne();
+    const sheep = await this.buildSheepQueryBuilder().where('sheep.id = :id', { id }).getOne();
 
     if (!sheep) {
       throw new NotFoundException('Sheep not found');
@@ -121,7 +127,7 @@ export class SheepService extends BaseService {
 
   async remove(id: SheepEntity['id']) {
     const sheep = await this.findOne(id);
-    await this.sheepCollarService.handleAssociation(sheep, null)
+    await this.sheepCollarService.handleAssociation(sheep, null);
 
     await this.sheepRepository.softRemove(sheep);
 

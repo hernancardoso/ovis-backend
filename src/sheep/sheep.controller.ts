@@ -3,8 +3,12 @@ import { SheepService } from './sheep.service';
 import { CreateSheepDto } from './dto/create-sheep.dto';
 import { UpdateSheepDto } from './dto/update-sheep.dto';
 import { User } from 'src/commons/decorators/user.decorator';
+import { AdminRoute } from 'src/commons/decorators/admin-route.decorator';
+import { AdminGuard } from 'src/commons/guards/admin.guard';
 import { EstablishmentEntity } from 'src/establishments/entities/establishment.entity';
 import { SheepFilterDto } from './dto/filter-sheep-dto';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { UseGuards } from '@nestjs/common';
 
 @Controller('sheep')
 export class SheepController {
@@ -24,6 +28,13 @@ export class SheepController {
     @Query() filter?: SheepFilterDto
   ) {
     return this.sheepService.findAll(establishmentId, filter);
+  }
+
+  @Get('all')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @AdminRoute()
+  findAllAcrossEstablishments(@Query() filter?: SheepFilterDto) {
+    return this.sheepService.findAllAcrossEstablishments(filter);
   }
 
   @Get(':id')
