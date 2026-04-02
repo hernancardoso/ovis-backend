@@ -1,4 +1,4 @@
-import { IsArray, IsString, IsOptional, IsNumber, IsIn, IsBoolean } from 'class-validator';
+import { IsArray, IsString, IsNumber } from 'class-validator';
 
 export class CreateExportDto {
   @IsArray()
@@ -14,12 +14,4 @@ export class CreateExportDto {
   @IsArray()
   @IsString({ each: true })
   columns: string[];
-
-  @IsString()
-  @IsIn(['CSV', 'JSON'])
-  format: 'CSV' | 'JSON';
-
-  @IsOptional()
-  @IsBoolean()
-  singleFile?: boolean;
 }

@@ -1,10 +1,15 @@
-import { Controller, Post, Get, Body, Param } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ExportsService } from './exports.service';
 import { CreateExportDto } from './dto/create-export.dto';
 import { User } from 'src/commons/decorators/user.decorator';
 import { User as IUser } from 'src/commons/interfaces/user.interface';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { AdminGuard } from 'src/commons/guards/admin.guard';
+import { AdminRoute } from 'src/commons/decorators/admin-route.decorator';
 
 @Controller('exports')
+@UseGuards(JwtAuthGuard, AdminGuard)
+@AdminRoute()
 export class ExportsController {
   constructor(private readonly exportsService: ExportsService) {}
 
@@ -13,7 +18,12 @@ export class ExportsController {
     @User() user: IUser,
     @Body() createExportDto: CreateExportDto
   ) {
-    return this.exportsService.createExport(createExportDto);
+    return this.exportsService.createExport(createExportDto, user);
+  }
+
+  @Get('history')
+  async getExportHistory(@User() user: IUser) {
+    return this.exportsService.listExportHistory();
   }
 
   @Get(':jobId/status')
@@ -40,4 +50,3 @@ export class ExportsController {
     return this.exportsService.refreshDownloadUrls(jobId);
   }
 }
-

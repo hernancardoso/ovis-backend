@@ -10,125 +10,281 @@ import {
   GetQueryExecutionCommand,
   QueryExecutionState,
 } from '@aws-sdk/client-athena';
-import { GlueClient, GetTableCommand } from '@aws-sdk/client-glue';
 import {
   S3Client,
-  ListObjectsV2Command,
   GetObjectCommand,
-  PutObjectCommand,
   HeadObjectCommand,
-  DeleteObjectCommand,
-  CreateMultipartUploadCommand,
-  UploadPartCommand,
-  CompleteMultipartUploadCommand,
-  AbortMultipartUploadCommand,
 } from '@aws-sdk/client-s3';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient, GetCommand, PutCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 import { CreateExportDto } from './dto/create-export.dto';
 import moment from 'moment';
-import { Readable } from 'stream';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, Repository } from 'typeorm';
+import { CollarEntity } from 'src/collars/entities/collar.entity';
+import { User as IUser } from 'src/commons/interfaces/user.interface';
+import { request as httpsRequest } from 'https';
+import { SignatureV4 } from '@smithy/signature-v4';
+import { HttpRequest } from '@smithy/protocol-http';
+import { Hash } from '@smithy/hash-node';
+import type { AwsCredentialIdentity } from '@aws-sdk/types';
 
-type ExportFormat = 'CSV' | 'JSON';
-type ExportMode = 'UNLOAD' | 'QUERY_RESULTS';
-type PostProcessingState = 'NOT_REQUIRED' | 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED';
+type ExportState = 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'QUEUED' | 'CANCELLED' | 'UNKNOWN';
+type PostProcessingState = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED';
 
 type ExportPostProcessing = {
-  type: 'NONE' | 'JSONL_MERGE';
+  type: 'JSONL_MERGE';
   state: PostProcessingState;
   outputFileName?: string;
   s3Key?: string;
   error?: string;
 };
 
-type ExportJob = {
-  queryExecutionId: string;
-  createdAt: Date;
-  columns: string[];
-  format: ExportFormat;
-  mode: ExportMode;
-  singleFile: boolean;
-  postProcessing: ExportPostProcessing;
-  postProcessingPromise?: Promise<void>;
+type ExportCollarSnapshot = {
+  id: string;
+  imei: number;
+  name: string;
 };
+
+type ExportStatistics = {
+  dataScannedBytes: number;
+  executionTimeMs?: number;
+  engineExecutionTimeMs?: number;
+};
+
+type ExportCostSummary = {
+  estimatedCostUsd: number;
+};
+
+type ExportJobRecord = {
+  jobId: string;
+  queryExecutionId: string;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+  requestedBy?: Pick<IUser, 'name' | 'email' | 'isAdmin'>;
+  collarImeis: number[];
+  selectedCollars: ExportCollarSnapshot[];
+  fromTimestamp: number;
+  toTimestamp: number;
+  columns: string[];
+  status: ExportState;
+  athenaState?: string;
+  s3Path?: string;
+  exportsBucket: string;
+  error?: string;
+  postProcessing: ExportPostProcessing;
+  statistics?: ExportStatistics;
+  fileLastModifiedAt?: string;
+  fileSizeBytes?: number;
+  ttl?: number;
+};
+
+type ExportJob = ExportJobRecord;
 
 @Injectable()
 export class ExportsService {
   private readonly athena: AthenaClient;
-  private readonly glue: GlueClient;
   private readonly s3: S3Client;
+  private readonly dynamodb: DynamoDBDocumentClient;
+  private readonly awsCredentials: AwsCredentialIdentity;
   private readonly databaseName = 'iot_raw';
   private readonly tableName = 'collar_messages';
+  private readonly awsRegion = process.env.AWS_REGION || 'us-east-1';
   private readonly exportsBucket = process.env.AWS_EXPORTS_BUCKET || 'iot-exports-prod';
   private readonly athenaWorkGroup = process.env.AWS_ATHENA_WORKGROUP || 'primary';
   private readonly athenaOutputLocation =
     process.env.AWS_ATHENA_OUTPUT_LOCATION || `s3://${this.exportsBucket}/athena-results/`;
-  private readonly multipartUploadPartSizeBytes = 8 * 1024 * 1024;
-  private readonly forceJsonSingleFileExports = true;
-
+  private readonly exportJobsTable = process.env.AWS_EXPORT_JOBS_TABLE || '';
+  private readonly exportMergeLambdaFunction =
+    process.env.AWS_EXPORT_MERGE_LAMBDA_FUNCTION || '';
+  private readonly exportHistoryRetentionDays = Number.parseInt(
+    process.env.AWS_EXPORT_HISTORY_RETENTION_DAYS || '30',
+    10
+  );
   private readonly jobStore = new Map<string, ExportJob>();
 
-  constructor() {
+  constructor(
+    @InjectRepository(CollarEntity)
+    private readonly collarRepository: Repository<CollarEntity>
+  ) {
+    this.awsCredentials = {
+      accessKeyId: process.env.AWS_ACCESS_KEY ?? '',
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? '',
+      ...(process.env.AWS_SESSION_TOKEN && { sessionToken: process.env.AWS_SESSION_TOKEN }),
+    };
+
     const awsConfig = {
-      region: process.env.AWS_REGION || 'us-east-1',
-      credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY ?? '',
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? '',
-        ...(process.env.AWS_SESSION_TOKEN && { sessionToken: process.env.AWS_SESSION_TOKEN }),
-      },
+      region: this.awsRegion,
+      credentials: this.awsCredentials,
       requestChecksumCalculation: 'WHEN_REQUIRED' as const,
     };
 
     this.athena = new AthenaClient(awsConfig);
-    this.glue = new GlueClient(awsConfig);
     this.s3 = new S3Client(awsConfig);
+    this.dynamodb = DynamoDBDocumentClient.from(new DynamoDBClient(awsConfig), {
+      marshallOptions: { removeUndefinedValues: true },
+    });
   }
 
-  private async getGlueColumnTypes(): Promise<Record<string, string>> {
-    const response = await this.glue.send(
-      new GetTableCommand({
-        DatabaseName: this.databaseName,
-        Name: this.tableName,
+  private nowIso() {
+    return new Date().toISOString();
+  }
+
+  private isPersistentStoreEnabled() {
+    return this.exportJobsTable.length > 0;
+  }
+
+  private buildJobTtl(createdAtIso: string) {
+    const retentionDays = Number.isFinite(this.exportHistoryRetentionDays)
+      ? this.exportHistoryRetentionDays
+      : 30;
+    return moment.utc(createdAtIso).add(retentionDays, 'days').unix();
+  }
+
+  private cloneJobForStorage(job: ExportJob): ExportJobRecord {
+    return job;
+  }
+
+  private cacheJob(job: ExportJob) {
+    this.jobStore.set(job.jobId, job);
+    return job;
+  }
+
+  private async saveJob(job: ExportJob) {
+    this.cacheJob(job);
+
+    if (!this.isPersistentStoreEnabled()) {
+      return;
+    }
+
+    await this.dynamodb.send(
+      new PutCommand({
+        TableName: this.exportJobsTable,
+        Item: this.cloneJobForStorage(job),
+      })
+    );
+  }
+
+  private async loadPersistedJob(jobId: string): Promise<ExportJob | null> {
+    if (!this.isPersistentStoreEnabled()) {
+      return null;
+    }
+
+    const response = await this.dynamodb.send(
+      new GetCommand({
+        TableName: this.exportJobsTable,
+        Key: { jobId },
       })
     );
 
-    const columns = response.Table?.StorageDescriptor?.Columns ?? [];
+    if (!response.Item) {
+      return null;
+    }
 
-    return columns.reduce<Record<string, string>>((acc, column) => {
-      const name = column.Name?.trim();
-      const type = column.Type?.trim().toLowerCase();
-
-      if (name && type) {
-        acc[name] = type;
-      }
-
-      return acc;
-    }, {});
+    const persistedJob = response.Item as ExportJobRecord;
+    return this.cacheJob(persistedJob);
   }
 
-  private isComplexGlueType(type?: string) {
-    if (!type) {
-      return false;
+  private async getJob(jobId: string) {
+    const persistedJob = await this.loadPersistedJob(jobId);
+    if (persistedJob) {
+      return persistedJob;
     }
 
-    return (
-      type.startsWith('array<') ||
-      type.startsWith('map<') ||
-      type.startsWith('struct<') ||
-      type.startsWith('row(')
-    );
+    const cachedJob = this.jobStore.get(jobId);
+    if (cachedJob) {
+      return cachedJob;
+    }
+
+    throw new NotFoundException(`Export job ${jobId} not found`);
   }
 
-  private buildExportColumnExpression(columnName: string, glueType?: string) {
-    if (this.isComplexGlueType(glueType)) {
-      return `CASE WHEN ${columnName} IS NULL THEN '' ELSE json_format(CAST(${columnName} AS JSON)) END AS ${columnName}`;
+  private async listJobsFromStore() {
+    if (!this.isPersistentStoreEnabled()) {
+      return Array.from(this.jobStore.values());
     }
 
-    if (glueType === 'string' || glueType?.startsWith('varchar') || glueType?.startsWith('char')) {
-      return `COALESCE(${columnName}, '') AS ${columnName}`;
+    const items: ExportJob[] = [];
+    let exclusiveStartKey: Record<string, unknown> | undefined;
+
+    do {
+      const response = await this.dynamodb.send(
+        new ScanCommand({
+          TableName: this.exportJobsTable,
+          ExclusiveStartKey: exclusiveStartKey,
+        })
+      );
+
+      items.push(...(response.Items || []).map((item) => this.cacheJob(item as ExportJob)));
+      exclusiveStartKey = response.LastEvaluatedKey;
+    } while (exclusiveStartKey);
+
+    return items
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  private isTerminalState(state?: ExportState) {
+    return state === 'SUCCEEDED' || state === 'FAILED' || state === 'CANCELLED';
+  }
+
+  private buildExportCostSummary(statistics?: ExportStatistics): ExportCostSummary {
+    const dataScannedBytes = statistics?.dataScannedBytes || 0;
+    const dataScannedTb = dataScannedBytes / (1024 ** 4);
+    const estimatedCostUsd = Number((dataScannedTb * 5).toFixed(6));
+
+    return {
+      estimatedCostUsd,
+    };
+  }
+
+  private ensureJsonlPipelineConfigured() {
+    if (!this.isPersistentStoreEnabled()) {
+      throw new InternalServerErrorException(
+        'Export jobs table is not configured. Set AWS_EXPORT_JOBS_TABLE before creating exports.'
+      );
     }
 
-    return `COALESCE(CAST(${columnName} AS VARCHAR), '') AS ${columnName}`;
+    if (!this.exportMergeLambdaFunction) {
+      throw new InternalServerErrorException(
+        'Export merge lambda is not configured. Set AWS_EXPORT_MERGE_LAMBDA_FUNCTION before creating exports.'
+      );
+    }
+  }
+
+  private async getSelectedCollars(collarImeis: number[]) {
+    if (collarImeis.length === 0) {
+      return [];
+    }
+
+    const collars = await this.collarRepository.find({
+      where: {
+        imei: In(collarImeis),
+      },
+      select: {
+        id: true,
+        imei: true,
+        name: true,
+      },
+    });
+
+    const byImei = new Map(collars.map((collar) => [collar.imei, collar]));
+    return collarImeis
+      .map((imei) => {
+        const collar = byImei.get(imei);
+        if (!collar) {
+          return null;
+        }
+
+        return {
+          id: collar.id,
+          imei: collar.imei,
+          name: collar.name,
+        } satisfies ExportCollarSnapshot;
+      })
+      .filter((collar): collar is ExportCollarSnapshot => collar !== null);
   }
 
   private buildPartitions(fromDate: moment.Moment, toDate: moment.Moment): string[] {
@@ -209,87 +365,25 @@ export class ExportsService {
     };
   }
 
-  private getFileExtension(format: ExportFormat): 'csv' | 'json' {
-    return format === 'JSON' ? 'json' : 'csv';
+  private getContentType() {
+    return 'application/x-ndjson; charset=utf-8';
   }
 
-  private getDownloadFileExtension(job: ExportJob, totalParts: number): 'csv' | 'json' | 'jsonl' {
-    if (job.format === 'JSON' && job.singleFile && totalParts <= 1) {
-      return 'jsonl';
-    }
-
-    return this.getFileExtension(job.format);
-  }
-
-  private getContentType(format: ExportFormat, singleFile: boolean = false): string {
-    if (format === 'JSON' && singleFile) {
-      return 'application/x-ndjson; charset=utf-8';
-    }
-
-    return format === 'JSON' ? 'application/json' : 'text/csv; charset=utf-8';
-  }
-
-  private isMetadataKey(key?: string): boolean {
-    if (!key) return true;
-
-    const fileName = key.split('/').pop() || '';
-    if (!fileName || fileName.startsWith('_')) return true;
-
-    const lowerName = fileName.toLowerCase();
-    return (
-      lowerName === 'manifest' ||
-      lowerName === 'metadata' ||
-      lowerName.endsWith('.manifest') ||
-      lowerName.endsWith('.metadata') ||
-      lowerName === 'success'
-    );
-  }
-
-  private parseS3Uri(s3Uri: string): { bucket: string; key: string } {
-    if (!s3Uri.startsWith('s3://')) {
-      throw new InternalServerErrorException(`Invalid S3 URI: ${s3Uri}`);
-    }
-
-    const withoutScheme = s3Uri.slice(5);
-    const firstSlash = withoutScheme.indexOf('/');
-    if (firstSlash <= 0 || firstSlash === withoutScheme.length - 1) {
-      throw new InternalServerErrorException(`Invalid S3 URI: ${s3Uri}`);
-    }
-
-    return {
-      bucket: withoutScheme.slice(0, firstSlash),
-      key: withoutScheme.slice(firstSlash + 1),
-    };
-  }
-
-  private buildFriendlyFileName(
-    jobId: string,
-    job: ExportJob,
-    index: number,
-    totalParts: number
-  ): string {
-    const extension = this.getDownloadFileExtension(job, totalParts);
-    if (totalParts <= 1) {
-      return `export_${jobId}.${extension}`;
-    }
-
-    const paddedIndex = String(index + 1).padStart(3, '0');
-    return `export_${jobId}_part_${paddedIndex}.${extension}`;
+  private buildFriendlyFileName(jobId: string) {
+    return `export_${jobId}.jsonl`;
   }
 
   private async createSignedDownloadUrl(
     bucket: string,
     key: string,
-    downloadFileName: string,
-    format: ExportFormat,
-    singleFile: boolean = false
+    downloadFileName: string
   ): Promise<string> {
     const safeFileName = downloadFileName.replace(/["\\]/g, '_');
     const getObjectCommand = new GetObjectCommand({
       Bucket: bucket,
       Key: key,
       ResponseContentDisposition: `attachment; filename="${safeFileName}"`,
-      ResponseContentType: this.getContentType(format, singleFile),
+      ResponseContentType: this.getContentType(),
     });
 
     // Double assertion needed: CI gets duplicate @smithy/types from different AWS packages, so
@@ -301,28 +395,117 @@ export class ExportsService {
     );
   }
 
-  private requiresJsonSingleFileMerge(job: ExportJob) {
-    return job.format === 'JSON' && job.singleFile && job.mode === 'UNLOAD';
-  }
-
-  private buildInitialPostProcessing(
-    jobId: string,
-    format: ExportFormat,
-    mode: ExportMode,
-    singleFile: boolean
-  ): ExportPostProcessing {
-    if (format === 'JSON' && singleFile && mode === 'UNLOAD') {
-      return {
-        type: 'JSONL_MERGE',
-        state: 'PENDING',
-        outputFileName: `export_${jobId}.jsonl`,
-        s3Key: this.getMergedJsonlKey(jobId),
-      };
+  private async invokeMergeLambda(jobId: string) {
+    if (!this.exportMergeLambdaFunction) {
+      return false;
     }
 
+    const body = JSON.stringify({ jobId });
+    const hostname = `lambda.${this.awsRegion}.amazonaws.com`;
+    const request = new HttpRequest({
+      protocol: 'https:',
+      hostname,
+      method: 'POST',
+      path: `/2015-03-31/functions/${encodeURIComponent(this.exportMergeLambdaFunction)}/invocations`,
+      headers: {
+        host: hostname,
+        'content-type': 'application/json',
+        'content-length': String(Buffer.byteLength(body)),
+        'x-amz-invocation-type': 'Event',
+      },
+      body,
+    });
+
+    const signer = new SignatureV4({
+      credentials: this.awsCredentials,
+      region: this.awsRegion,
+      service: 'lambda',
+      sha256: Hash.bind(null, 'sha256'),
+    });
+
+    const signedRequest = await signer.sign(request);
+
+    await new Promise<void>((resolve, reject) => {
+      const req = httpsRequest(
+        {
+          protocol: 'https:',
+          hostname,
+          method: 'POST',
+          path: signedRequest.path,
+          headers: signedRequest.headers,
+        },
+        (res) => {
+          const chunks: Buffer[] = [];
+          res.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+          res.on('end', () => {
+            const responseBody = Buffer.concat(chunks).toString('utf-8');
+            if ((res.statusCode || 500) >= 200 && (res.statusCode || 500) < 300) {
+              resolve();
+              return;
+            }
+
+            reject(
+              new Error(
+                `Lambda invoke failed with status ${res.statusCode}: ${responseBody || 'empty body'}`
+              )
+            );
+          });
+        }
+      );
+
+      req.on('error', reject);
+      req.write(body);
+      req.end();
+    });
+
+    return true;
+  }
+
+  private async captureFileMetadata(job: ExportJob, bucket: string, key: string) {
+    const response = await this.s3.send(
+      new HeadObjectCommand({
+        Bucket: bucket,
+        Key: key,
+      })
+    );
+
+    job.fileLastModifiedAt = response.LastModified?.toISOString();
+    job.fileSizeBytes = response.ContentLength;
+    job.completedAt = job.completedAt || response.LastModified?.toISOString() || this.nowIso();
+  }
+
+  private async buildDownloadFile(job: ExportJob) {
+    if (
+      job.status !== 'SUCCEEDED' ||
+      job.postProcessing.state !== 'SUCCEEDED' ||
+      !job.postProcessing.s3Key
+    ) {
+      return null;
+    }
+
+    const bucket = job.exportsBucket;
+    const key = job.postProcessing.s3Key;
+
+    if (!job.fileLastModifiedAt || typeof job.fileSizeBytes !== 'number') {
+      await this.captureFileMetadata(job, bucket, key);
+      await this.saveJob(job);
+    }
+
+    const fileName = job.postProcessing.outputFileName || this.buildFriendlyFileName(job.jobId);
+
     return {
-      type: 'NONE',
-      state: 'NOT_REQUIRED',
+      name: fileName,
+      size: job.fileSizeBytes || 0,
+      downloadUrl: await this.createSignedDownloadUrl(bucket, key, fileName),
+    };
+  }
+
+  private buildInitialPostProcessing(jobId: string): ExportPostProcessing {
+    return {
+      type: 'JSONL_MERGE',
+      state: 'PENDING',
+      outputFileName: this.buildFriendlyFileName(jobId),
+      s3Key: this.getMergedJsonlKey(jobId),
     };
   }
 
@@ -330,245 +513,7 @@ export class ExportsService {
     return `exports/${jobId}/merged/export_${jobId}.jsonl`;
   }
 
-  private buildJsonExportColumnExpression(columnName: string) {
-    return `${columnName}`;
-  }
-
-  private buildCsvExportColumnExpression(columnName: string, glueType?: string) {
-    return this.buildExportColumnExpression(columnName, glueType);
-  }
-
-  private async listAllObjects(bucket: string, prefix: string) {
-    const objects: Array<{ Key?: string; Size?: number }> = [];
-    let continuationToken: string | undefined;
-
-    do {
-      const response = await this.s3.send(
-        new ListObjectsV2Command({
-          Bucket: bucket,
-          Prefix: prefix,
-          ContinuationToken: continuationToken,
-        })
-      );
-
-      objects.push(...(response.Contents ?? []));
-      continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
-    } while (continuationToken);
-
-    return objects;
-  }
-
-  private async listUnloadDataObjects(jobId: string) {
-    const prefix = `exports/${jobId}/`;
-    const mergedKey = this.getMergedJsonlKey(jobId);
-    const objects = await this.listAllObjects(this.exportsBucket, prefix);
-
-    return objects
-      .filter((obj) => !this.isMetadataKey(obj.Key))
-      .filter((obj) => obj.Key !== mergedKey)
-      .filter((obj) => !obj.Key?.startsWith(`${prefix}merged/`))
-      .sort((a, b) => (a.Key || '').localeCompare(b.Key || ''));
-  }
-
-  private normalizeChunk(chunk: Buffer | Uint8Array | string) {
-    if (typeof chunk === 'string') {
-      return Buffer.from(chunk);
-    }
-
-    return Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-  }
-
-  private async mergeUnloadJsonPartsToJsonl(jobId: string, job: ExportJob) {
-    const targetKey = this.getMergedJsonlKey(jobId);
-    const outputFileName = this.buildFriendlyFileName(jobId, job, 0, 1);
-    const dataObjects = await this.listUnloadDataObjects(jobId);
-    let uploadId: string | undefined;
-
-    try {
-      if (dataObjects.length === 0) {
-        await this.s3.send(
-          new PutObjectCommand({
-            Bucket: this.exportsBucket,
-            Key: targetKey,
-            Body: '',
-            ContentType: this.getContentType(job.format, true),
-          })
-        );
-
-        job.postProcessing = {
-          type: 'JSONL_MERGE',
-          state: 'SUCCEEDED',
-          outputFileName,
-          s3Key: targetKey,
-        };
-
-        return;
-      }
-
-      const createMultipartResponse = await this.s3.send(
-        new CreateMultipartUploadCommand({
-          Bucket: this.exportsBucket,
-          Key: targetKey,
-          ContentType: this.getContentType(job.format, true),
-        })
-      );
-
-      uploadId = createMultipartResponse.UploadId;
-      if (!uploadId) {
-        throw new Error('Failed to create multipart upload for NDJSON export');
-      }
-
-      const completedParts: Array<{ ETag: string; PartNumber: number }> = [];
-      let partNumber = 1;
-      let pendingBuffers: Buffer[] = [];
-      let pendingLength = 0;
-      let previousObjectHadData = false;
-
-      const flushPending = async (force: boolean = false) => {
-        if (pendingLength === 0) {
-          return;
-        }
-
-        if (!force && pendingLength < this.multipartUploadPartSizeBytes) {
-          return;
-        }
-
-        const body = Buffer.concat(pendingBuffers as any[], pendingLength);
-        const uploadPartResponse = await this.s3.send(
-          new UploadPartCommand({
-            Bucket: this.exportsBucket,
-            Key: targetKey,
-            UploadId: uploadId,
-            PartNumber: partNumber,
-            Body: body,
-            ContentLength: body.length,
-          })
-        );
-
-        if (!uploadPartResponse.ETag) {
-          throw new Error(`Missing ETag for NDJSON multipart part ${partNumber}`);
-        }
-
-        completedParts.push({
-          ETag: uploadPartResponse.ETag,
-          PartNumber: partNumber,
-        });
-
-        partNumber += 1;
-        pendingBuffers = [];
-        pendingLength = 0;
-      };
-
-      const pushBuffer = async (buffer: Buffer) => {
-        if (buffer.length === 0) {
-          return;
-        }
-
-        pendingBuffers.push(buffer);
-        pendingLength += buffer.length;
-
-        while (pendingLength >= this.multipartUploadPartSizeBytes) {
-          await flushPending(true);
-        }
-      };
-
-      for (const obj of dataObjects) {
-        const key = obj.Key;
-        if (!key) continue;
-
-        if (previousObjectHadData) {
-          await pushBuffer(Buffer.from('\n'));
-        }
-
-        const response = await this.s3.send(
-          new GetObjectCommand({
-            Bucket: this.exportsBucket,
-            Key: key,
-          })
-        );
-
-        const body = response.Body as Readable | undefined;
-        if (!body) {
-          continue;
-        }
-
-        let bytesWritten = 0;
-        let endedWithNewline = false;
-
-        for await (const chunk of body) {
-          const buffer = this.normalizeChunk(chunk as Buffer | Uint8Array | string);
-          bytesWritten += buffer.length;
-          endedWithNewline = buffer.length > 0 && buffer[buffer.length - 1] === 0x0a;
-          await pushBuffer(buffer);
-        }
-
-        if (bytesWritten > 0) {
-          previousObjectHadData = true;
-
-          if (!endedWithNewline) {
-            await pushBuffer(Buffer.from('\n'));
-          }
-        }
-      }
-
-      await flushPending(true);
-
-      await this.s3.send(
-        new CompleteMultipartUploadCommand({
-          Bucket: this.exportsBucket,
-          Key: targetKey,
-          UploadId: uploadId,
-          MultipartUpload: {
-            Parts: completedParts,
-          },
-        })
-      );
-
-      job.postProcessing = {
-        type: 'JSONL_MERGE',
-        state: 'SUCCEEDED',
-        outputFileName,
-        s3Key: targetKey,
-      };
-    } catch (error: any) {
-      if (uploadId) {
-        await this.s3
-          .send(
-            new AbortMultipartUploadCommand({
-              Bucket: this.exportsBucket,
-              Key: targetKey,
-              UploadId: uploadId,
-            })
-          )
-          .catch(() => undefined);
-      } else {
-        await this.s3
-          .send(
-            new DeleteObjectCommand({
-              Bucket: this.exportsBucket,
-              Key: targetKey,
-            })
-          )
-          .catch(() => undefined);
-      }
-
-      job.postProcessing = {
-        type: 'JSONL_MERGE',
-        state: 'FAILED',
-        outputFileName,
-        s3Key: targetKey,
-        error: error?.message || 'Failed to merge JSON files into NDJSON',
-      };
-
-      throw error;
-    }
-  }
-
-  private async ensureJsonSingleFileMerge(jobId: string, job: ExportJob) {
-    if (!this.requiresJsonSingleFileMerge(job)) {
-      return;
-    }
-
+  private async ensureJsonlMergeStarted(jobId: string, job: ExportJob) {
     if (
       job.postProcessing.state === 'SUCCEEDED' ||
       job.postProcessing.state === 'RUNNING' ||
@@ -577,45 +522,155 @@ export class ExportsService {
       return;
     }
 
-    const dataObjects = await this.listUnloadDataObjects(jobId);
-    if (dataObjects.length === 1 && dataObjects[0].Key) {
-      job.postProcessing = {
-        type: 'JSONL_MERGE',
-        state: 'SUCCEEDED',
-        outputFileName: this.buildFriendlyFileName(jobId, job, 0, 1),
-        s3Key: dataObjects[0].Key,
-        error: undefined,
-      };
-      return;
-    }
-
     job.postProcessing = {
       ...job.postProcessing,
       type: 'JSONL_MERGE',
       state: 'RUNNING',
-      outputFileName: this.buildFriendlyFileName(jobId, job, 0, 1),
+      outputFileName: this.buildFriendlyFileName(jobId),
       s3Key: this.getMergedJsonlKey(jobId),
       error: undefined,
     };
+    job.status = 'RUNNING';
+    job.error = undefined;
+    await this.saveJob(job);
 
-    job.postProcessingPromise = this.mergeUnloadJsonPartsToJsonl(jobId, job)
-      .catch(() => undefined)
-      .finally(() => {
-        job.postProcessingPromise = undefined;
-      });
+    try {
+      await this.invokeMergeLambda(jobId);
+    } catch (error: any) {
+      job.postProcessing = {
+        ...job.postProcessing,
+        state: 'FAILED',
+        error: error?.message || 'Failed to invoke export merge lambda',
+      };
+      job.status = 'FAILED';
+      job.error = job.postProcessing.error;
+      await this.saveJob(job);
+    }
   }
 
-  async createExport(createExportDto: CreateExportDto) {
+  private async refreshJobState(job: ExportJob) {
+    const getQueryCommand = new GetQueryExecutionCommand({
+      QueryExecutionId: job.queryExecutionId,
+    });
+
+    const response = await this.athena.send(getQueryCommand);
+    const queryExecution = response.QueryExecution;
+
+    if (!queryExecution) {
+      throw new NotFoundException(`Query execution not found for job ${job.jobId}`);
+    }
+
+    const athenaState = queryExecution.Status?.State as QueryExecutionState;
+    let stateString: ExportState = athenaState ? (String(athenaState) as ExportState) : 'UNKNOWN';
+    let error = queryExecution.Status?.StateChangeReason;
+    let s3Path =
+      athenaState === QueryExecutionState.SUCCEEDED
+        ? `s3://${this.exportsBucket}/exports/${job.jobId}/`
+        : undefined;
+
+    const dataScannedBytes = queryExecution.Statistics?.DataScannedInBytes || 0;
+
+    if (athenaState === QueryExecutionState.SUCCEEDED) {
+      await this.ensureJsonlMergeStarted(job.jobId, job);
+
+      if (job.postProcessing.state === 'RUNNING' || job.postProcessing.state === 'PENDING') {
+        stateString = 'RUNNING';
+        error = undefined;
+        s3Path = undefined;
+      } else if (job.postProcessing.state === 'FAILED') {
+        stateString = 'FAILED';
+        error = job.postProcessing.error || 'Failed to prepare single NDJSON file';
+        s3Path = undefined;
+      } else if (job.postProcessing.state === 'SUCCEEDED') {
+        stateString = 'SUCCEEDED';
+        s3Path = job.postProcessing.s3Key
+          ? `s3://${this.exportsBucket}/${job.postProcessing.s3Key}`
+          : s3Path;
+      }
+    }
+
+    job.status = stateString;
+    job.athenaState = athenaState ? String(athenaState) : 'UNKNOWN';
+    job.s3Path = s3Path;
+    job.error = error;
+    job.statistics = {
+      dataScannedBytes,
+      executionTimeMs: queryExecution.Statistics?.TotalExecutionTimeInMillis,
+      engineExecutionTimeMs: queryExecution.Statistics?.EngineExecutionTimeInMillis,
+    };
+    job.updatedAt = this.nowIso();
+    if (stateString === 'SUCCEEDED') {
+      job.completedAt = job.completedAt || this.nowIso();
+    }
+
+    await this.saveJob(job);
+    return job;
+  }
+
+  async listExportHistory() {
+    const jobs = (await this.listJobsFromStore()).slice(0, 50);
+
+    const hydratedJobs = await Promise.all(
+      jobs.map(async (job) => {
+        if (this.isTerminalState(job.status)) {
+          return job;
+        }
+
+        try {
+          return await this.refreshJobState(job);
+        } catch (error: any) {
+          job.error = job.error || error?.message || 'Failed to refresh export state';
+          job.updatedAt = this.nowIso();
+          return job;
+        }
+      })
+    );
+
+    return Promise.all(
+      hydratedJobs.map(async (job) => {
+        let downloadFile: Awaited<ReturnType<typeof this.buildDownloadFile>> = null;
+
+        try {
+          downloadFile = await this.buildDownloadFile(job);
+        } catch {
+          downloadFile = null;
+        }
+
+        return {
+          jobId: job.jobId,
+          createdAt: job.createdAt,
+          updatedAt: job.updatedAt,
+          completedAt: job.completedAt,
+          requestedBy: job.requestedBy,
+          collarImeis: job.collarImeis,
+          selectedCollars: job.selectedCollars,
+          fromTimestamp: job.fromTimestamp,
+          toTimestamp: job.toTimestamp,
+          columns: job.columns,
+          state: job.status,
+          athenaState: job.athenaState,
+          error: job.error,
+          s3Path: job.s3Path,
+          postProcessing: job.postProcessing,
+          fileLastModifiedAt: job.fileLastModifiedAt,
+          fileSizeBytes: job.fileSizeBytes,
+          cost: this.buildExportCostSummary(job.statistics),
+          downloadFile,
+        };
+      })
+    );
+  }
+
+  async createExport(createExportDto: CreateExportDto, user?: IUser) {
+    this.ensureJsonlPipelineConfigured();
+
     const jobId = randomUUID();
     const { collarImeis, columns } = createExportDto;
-    const format = this.forceJsonSingleFileExports ? 'JSON' : createExportDto.format;
-    const singleFile = this.forceJsonSingleFileExports ? true : createExportDto.singleFile ?? false;
-    const glueColumnTypes = columns.length > 0 ? await this.getGlueColumnTypes() : {};
+    const selectedCollars = await this.getSelectedCollars(collarImeis);
     const { fromTimestamp, toTimestamp, partitionFromDate, partitionToDate } =
       this.resolveTimestampRange(createExportDto);
     const partitions = this.buildPartitions(partitionFromDate, partitionToDate);
     const columnList = columns.length > 0 ? columns.join(', ') : '*';
-    const shouldUseSingleFileQuery = format === 'CSV' && singleFile;
 
     const imeiFilter = collarImeis.length > 0 ? `AND imei IN (${collarImeis.join(', ')})` : '';
 
@@ -624,37 +679,9 @@ export class ExportsService {
     const partitionFilter = partitions.join(' OR ');
     const unloadS3Path = `s3://${this.exportsBucket}/exports/${jobId}/`;
 
-    const selectedColumnsExpression =
-      columns.length > 0
-        ? format === 'JSON'
-          ? columns.map((col) => this.buildJsonExportColumnExpression(col)).join(', ')
-          : columns
-              .map((col) => this.buildCsvExportColumnExpression(col, glueColumnTypes[col]))
-              .join(', ')
-        : columnList;
-
-    let query: string;
-    let mode: ExportMode;
-
     const orderByClause = 'ORDER BY timestamp ASC';
-
-    if (shouldUseSingleFileQuery) {
-      mode = 'QUERY_RESULTS';
-      query = `SELECT ${columns.length > 0 ? selectedColumnsExpression : columnList}
-FROM ${this.databaseName}.${this.tableName}
-WHERE (${partitionFilter})
-  ${imeiFilter}
-  ${timestampFilter}
-  ${orderByClause}`;
-    } else {
-      mode = 'UNLOAD';
-      const withClause =
-        format === 'JSON'
-          ? `format = 'JSON', compression = 'NONE'`
-          : `format = 'TEXTFILE', field_delimiter = ';', compression = 'NONE'`;
-
-      query = `UNLOAD (
-  SELECT ${columns.length > 0 ? selectedColumnsExpression : columnList}
+    const query = `UNLOAD (
+  SELECT ${columnList}
   FROM ${this.databaseName}.${this.tableName}
   WHERE (${partitionFilter})
     ${imeiFilter}
@@ -663,9 +690,9 @@ WHERE (${partitionFilter})
 )
 TO '${unloadS3Path}'
 WITH (
-  ${withClause}
+  format = 'JSON',
+  compression = 'NONE'
 )`;
-    }
 
     try {
       const startQueryCommand = new StartQueryExecutionCommand({
@@ -686,15 +713,29 @@ WITH (
         throw new InternalServerErrorException('Failed to start query execution');
       }
 
-      const createdAt = new Date();
-      this.jobStore.set(jobId, {
+      const createdAt = this.nowIso();
+      await this.saveJob({
+        jobId,
         queryExecutionId,
         createdAt,
+        updatedAt: createdAt,
+        requestedBy: user
+          ? {
+              name: user.name,
+              email: user.email,
+              isAdmin: user.isAdmin,
+            }
+          : undefined,
+        collarImeis,
+        selectedCollars,
+        fromTimestamp,
+        toTimestamp,
         columns: columns.length > 0 ? columns : [],
-        format,
-        mode,
-        singleFile,
-        postProcessing: this.buildInitialPostProcessing(jobId, format, mode, singleFile),
+        status: 'QUEUED',
+        athenaState: 'QUEUED',
+        exportsBucket: this.exportsBucket,
+        postProcessing: this.buildInitialPostProcessing(jobId),
+        ttl: this.buildJobTtl(createdAt),
       });
 
       return { jobId };
@@ -704,68 +745,19 @@ WITH (
   }
 
   async getExportStatus(jobId: string) {
-    const job = this.jobStore.get(jobId);
-    if (!job) {
-      throw new NotFoundException(`Export job ${jobId} not found`);
-    }
+    const job = await this.getJob(jobId);
 
     try {
-      const getQueryCommand = new GetQueryExecutionCommand({
-        QueryExecutionId: job.queryExecutionId,
-      });
-
-      const response = await this.athena.send(getQueryCommand);
-      const queryExecution = response.QueryExecution;
-
-      if (!queryExecution) {
-        throw new NotFoundException(`Query execution not found for job ${jobId}`);
-      }
-
-      const athenaState = queryExecution.Status?.State as QueryExecutionState;
-      let stateString = athenaState ? String(athenaState) : 'UNKNOWN';
-      let error = queryExecution.Status?.StateChangeReason;
-      let s3Path =
-        athenaState === QueryExecutionState.SUCCEEDED
-          ? job.mode === 'UNLOAD'
-            ? `s3://${this.exportsBucket}/exports/${jobId}/`
-            : queryExecution.ResultConfiguration?.OutputLocation
-          : undefined;
-
-      const dataScannedBytes = queryExecution.Statistics?.DataScannedInBytes || 0;
-
-      if (athenaState === QueryExecutionState.SUCCEEDED && this.requiresJsonSingleFileMerge(job)) {
-        await this.ensureJsonSingleFileMerge(jobId, job);
-
-        if (job.postProcessing.state === 'RUNNING' || job.postProcessing.state === 'PENDING') {
-          stateString = 'RUNNING';
-          error = undefined;
-          s3Path = undefined;
-        } else if (job.postProcessing.state === 'FAILED') {
-          stateString = 'FAILED';
-          error = job.postProcessing.error || 'Failed to prepare single NDJSON file';
-          s3Path = undefined;
-        } else if (job.postProcessing.state === 'SUCCEEDED') {
-          stateString = 'SUCCEEDED';
-          s3Path = job.postProcessing.s3Key
-            ? `s3://${this.exportsBucket}/${job.postProcessing.s3Key}`
-            : s3Path;
-        }
-      }
+      const refreshedJob = await this.refreshJobState(job);
 
       return {
-        state: stateString,
-        mode: job.mode,
-        format: job.format,
-        singleFile: job.singleFile,
-        columns: job.columns,
-        s3Path,
-        error,
-        postProcessing: job.postProcessing,
-        statistics: {
-          dataScannedBytes,
-          executionTimeMs: queryExecution.Statistics?.TotalExecutionTimeInMillis,
-          engineExecutionTimeMs: queryExecution.Statistics?.EngineExecutionTimeInMillis,
-        },
+        state: refreshedJob.status,
+        columns: refreshedJob.columns,
+        s3Path: refreshedJob.s3Path,
+        error: refreshedJob.error,
+        postProcessing: refreshedJob.postProcessing,
+        statistics: refreshedJob.statistics,
+        cost: this.buildExportCostSummary(refreshedJob.statistics),
       };
     } catch (error: any) {
       throw new InternalServerErrorException(`Failed to get export status: ${error.message}`);
@@ -773,11 +765,6 @@ WITH (
   }
 
   async getExportFiles(jobId: string) {
-    const job = this.jobStore.get(jobId);
-    if (!job) {
-      throw new NotFoundException(`Export job ${jobId} not found`);
-    }
-
     const status = await this.getExportStatus(jobId);
     if (status.state !== 'SUCCEEDED') {
       throw new InternalServerErrorException(
@@ -786,100 +773,37 @@ WITH (
     }
 
     try {
-      if (this.requiresJsonSingleFileMerge(job)) {
-        if (job.postProcessing.state !== 'SUCCEEDED' || !job.postProcessing.s3Key) {
-          throw new InternalServerErrorException(
-            `Export job ${jobId} is still preparing the single NDJSON file`
-          );
-        }
+      const job = await this.getJob(jobId);
 
-        const headResponse = await this.s3.send(
-          new HeadObjectCommand({
-            Bucket: this.exportsBucket,
-            Key: job.postProcessing.s3Key,
-          })
+      if (job.postProcessing.state !== 'SUCCEEDED' || !job.postProcessing.s3Key) {
+        throw new InternalServerErrorException(
+          `Export job ${jobId} is still preparing the single NDJSON file`
         );
-
-        const friendlyName =
-          job.postProcessing.outputFileName || this.buildFriendlyFileName(jobId, job, 0, 1);
-        const downloadUrl = await this.createSignedDownloadUrl(
-          this.exportsBucket,
-          job.postProcessing.s3Key,
-          friendlyName,
-          job.format,
-          true
-        );
-
-        return [
-          {
-            name: friendlyName,
-            size: headResponse.ContentLength || 0,
-            downloadUrl,
-          },
-        ];
       }
 
-      if (job.mode === 'QUERY_RESULTS') {
-        const getQueryCommand = new GetQueryExecutionCommand({
-          QueryExecutionId: job.queryExecutionId,
-        });
-        const queryResponse = await this.athena.send(getQueryCommand);
-        const outputLocation = queryResponse.QueryExecution?.ResultConfiguration?.OutputLocation;
-        if (!outputLocation) {
-          throw new InternalServerErrorException(
-            `No output location found for export job ${jobId}`
-          );
-        }
-
-        const { bucket, key } = this.parseS3Uri(outputLocation);
-        const listCommand = new ListObjectsV2Command({
-          Bucket: bucket,
-          Prefix: key,
-        });
-        const listResponse = await this.s3.send(listCommand);
-        const outputObject = (listResponse.Contents || []).find((obj) => obj.Key === key);
-
-        const friendlyName = this.buildFriendlyFileName(jobId, job, 0, 1);
-        const downloadUrl = await this.createSignedDownloadUrl(
-          bucket,
-          key,
-          friendlyName,
-          job.format,
-          job.singleFile
-        );
-
-        return [
-          {
-            name: friendlyName,
-            size: outputObject?.Size || 0,
-            downloadUrl,
-          },
-        ];
-      }
-
-      const dataObjects = await this.listUnloadDataObjects(jobId);
-
-      const files = await Promise.all(
-        dataObjects.map(async (obj, index) => {
-          const key = obj.Key as string;
-          const friendlyName = this.buildFriendlyFileName(jobId, job, index, dataObjects.length);
-          const downloadUrl = await this.createSignedDownloadUrl(
-            this.exportsBucket,
-            key,
-            friendlyName,
-            job.format,
-            false
-          );
-
-          return {
-            name: friendlyName,
-            size: obj.Size || 0,
-            downloadUrl,
-          };
+      const headResponse = await this.s3.send(
+        new HeadObjectCommand({
+          Bucket: this.exportsBucket,
+          Key: job.postProcessing.s3Key,
         })
       );
 
-      return files;
+      const friendlyName = job.postProcessing.outputFileName || this.buildFriendlyFileName(jobId);
+      await this.captureFileMetadata(job, this.exportsBucket, job.postProcessing.s3Key);
+      await this.saveJob(job);
+      const downloadUrl = await this.createSignedDownloadUrl(
+        this.exportsBucket,
+        job.postProcessing.s3Key,
+        friendlyName
+      );
+
+      return [
+        {
+          name: friendlyName,
+          size: headResponse.ContentLength || 0,
+          downloadUrl,
+        },
+      ];
     } catch (error: any) {
       throw new InternalServerErrorException(`Failed to list export files: ${error.message}`);
     }
