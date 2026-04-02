@@ -14,10 +14,7 @@ export class ExportsController {
   constructor(private readonly exportsService: ExportsService) {}
 
   @Post()
-  async createExport(
-    @User() user: IUser,
-    @Body() createExportDto: CreateExportDto
-  ) {
+  async createExport(@User() user: IUser, @Body() createExportDto: CreateExportDto) {
     return this.exportsService.createExport(createExportDto, user);
   }
 
@@ -27,26 +24,17 @@ export class ExportsController {
   }
 
   @Get(':jobId/status')
-  async getExportStatus(
-    @User() user: IUser,
-    @Param('jobId') jobId: string
-  ) {
+  async getExportStatus(@User() user: IUser, @Param('jobId') jobId: string) {
     return this.exportsService.getExportStatus(jobId);
   }
 
   @Get(':jobId/files')
-  async getExportFiles(
-    @User() user: IUser,
-    @Param('jobId') jobId: string
-  ) { 
+  async getExportFiles(@User() user: IUser, @Param('jobId') jobId: string) {
     return this.exportsService.getExportFiles(jobId);
   }
 
   @Get(':jobId/files/refresh')
-  async refreshDownloadUrls(
-    @User() user: IUser,
-    @Param('jobId') jobId: string
-  ) {
+  async refreshDownloadUrls(@User() user: IUser, @Param('jobId') jobId: string) {
     return this.exportsService.refreshDownloadUrls(jobId);
   }
 }
