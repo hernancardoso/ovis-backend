@@ -133,6 +133,12 @@ export class CollarsService extends BaseService {
     return this.dynamoDBCollarService.enrichCollarsWithActivityData(collars);
   }
 
+  async findAllAcrossEstablishments(filter?: CollarFilterDto) {
+    const collars = await this.buildCollarQueryBuilder().getMany();
+
+    return collars;
+  }
+
   async findOneInEstablishment(
     establishmentId: EstablishmentEntity['id'],
     id: string

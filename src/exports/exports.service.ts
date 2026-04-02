@@ -564,7 +564,7 @@ export class ExportsService {
     }
   }
 
-  private ensureJsonSingleFileMerge(jobId: string, job: ExportJob) {
+  private async ensureJsonSingleFileMerge(jobId: string, job: ExportJob) {
     if (!this.requiresJsonSingleFileMerge(job)) {
       return;
     }
@@ -574,6 +574,18 @@ export class ExportsService {
       job.postProcessing.state === 'RUNNING' ||
       job.postProcessing.state === 'FAILED'
     ) {
+      return;
+    }
+
+    const dataObjects = await this.listUnloadDataObjects(jobId);
+    if (dataObjects.length === 1 && dataObjects[0].Key) {
+      job.postProcessing = {
+        type: 'JSONL_MERGE',
+        state: 'SUCCEEDED',
+        outputFileName: this.buildFriendlyFileName(jobId, job, 0, 1),
+        s3Key: dataObjects[0].Key,
+        error: undefined,
+      };
       return;
     }
 
@@ -722,7 +734,7 @@ WITH (
       const dataScannedBytes = queryExecution.Statistics?.DataScannedInBytes || 0;
 
       if (athenaState === QueryExecutionState.SUCCEEDED && this.requiresJsonSingleFileMerge(job)) {
-        this.ensureJsonSingleFileMerge(jobId, job);
+        await this.ensureJsonSingleFileMerge(jobId, job);
 
         if (job.postProcessing.state === 'RUNNING' || job.postProcessing.state === 'PENDING') {
           stateString = 'RUNNING';

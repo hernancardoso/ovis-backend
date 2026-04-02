@@ -43,6 +43,7 @@
     "amazon-cognito-identity-js": "^6.3.12",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "duckdb": "^1.4.4",
     "global-agent": "^3.0.0",
     "jwks-rsa": "^3.1.0",
     "moment": "^2.30.1",

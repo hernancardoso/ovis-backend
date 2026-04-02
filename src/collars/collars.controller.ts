@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Logger } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+  Logger,
+  UseGuards,
+} from '@nestjs/common';
 import { CollarsService } from './collars.service';
 import { CreateCollarDto } from './dto/create-collar.dto';
 import { UpdateCollarDto } from './dto/update-collar.dto';
@@ -8,6 +19,9 @@ import { CollarFilterDto } from './dto/collar-filter.dto';
 import { GetInitialFilterDto } from './dto/get-initial-info.dto';
 import { IotShadowService } from './services/iot-shadow.service';
 import { UpdateShadowDto } from './dto/update-shadow.dto';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { AdminGuard } from 'src/commons/guards/admin.guard';
+import { AdminRoute } from 'src/commons/decorators/admin-route.decorator';
 
 @Controller('collars')
 export class CollarsController {
@@ -32,6 +46,13 @@ export class CollarsController {
     @Query() filter?: CollarFilterDto
   ) {
     return this.collarsService.findAll(establishmentId, filter);
+  }
+
+  @Get('all')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @AdminRoute()
+  findAllAcrossEstablishments(@Query() filter?: CollarFilterDto) {
+    return this.collarsService.findAllAcrossEstablishments(filter);
   }
 
   @Get(':imei/info')
