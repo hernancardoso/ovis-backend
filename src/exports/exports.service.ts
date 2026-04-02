@@ -10,11 +10,7 @@ import {
   GetQueryExecutionCommand,
   QueryExecutionState,
 } from '@aws-sdk/client-athena';
-import {
-  S3Client,
-  GetObjectCommand,
-  HeadObjectCommand,
-} from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, PutCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -98,8 +94,7 @@ export class ExportsService {
   private readonly athenaOutputLocation =
     process.env.AWS_ATHENA_OUTPUT_LOCATION || `s3://${this.exportsBucket}/athena-results/`;
   private readonly exportJobsTable = process.env.AWS_EXPORT_JOBS_TABLE || '';
-  private readonly exportMergeLambdaFunction =
-    process.env.AWS_EXPORT_MERGE_LAMBDA_FUNCTION || '';
+  private readonly exportMergeLambdaFunction = process.env.AWS_EXPORT_MERGE_LAMBDA_FUNCTION || '';
   private readonly exportHistoryRetentionDays = Number.parseInt(
     process.env.AWS_EXPORT_HISTORY_RETENTION_DAYS || '30',
     10
@@ -222,8 +217,7 @@ export class ExportsService {
       exclusiveStartKey = response.LastEvaluatedKey;
     } while (exclusiveStartKey);
 
-    return items
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
   private isTerminalState(state?: ExportState) {
@@ -232,7 +226,7 @@ export class ExportsService {
 
   private buildExportCostSummary(statistics?: ExportStatistics): ExportCostSummary {
     const dataScannedBytes = statistics?.dataScannedBytes || 0;
-    const dataScannedTb = dataScannedBytes / (1024 ** 4);
+    const dataScannedTb = dataScannedBytes / 1024 ** 4;
     const estimatedCostUsd = Number((dataScannedTb * 5).toFixed(6));
 
     return {
@@ -408,7 +402,7 @@ export class ExportsService {
       method: 'POST',
       path: `/2015-03-31/functions/${encodeURIComponent(this.exportMergeLambdaFunction)}/invocations`,
       headers: {
-        host: hostname,
+        'host': hostname,
         'content-type': 'application/json',
         'content-length': String(Buffer.byteLength(body)),
         'x-amz-invocation-type': 'Event',
@@ -436,7 +430,9 @@ export class ExportsService {
         },
         (res) => {
           const chunks: Buffer[] = [];
-          res.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+          res.on('data', (chunk) =>
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+          );
           res.on('end', () => {
             const responseBody = Buffer.concat(chunks).toString('utf-8');
             if ((res.statusCode || 500) >= 200 && (res.statusCode || 500) < 300) {
