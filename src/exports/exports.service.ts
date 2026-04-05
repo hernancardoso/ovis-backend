@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -82,6 +83,7 @@ type ExportJob = ExportJobRecord;
 
 @Injectable()
 export class ExportsService {
+  private readonly logger = new Logger(ExportsService.name);
   private readonly athena: AthenaClient;
   private readonly s3: S3Client;
   private readonly dynamodb: DynamoDBDocumentClient;
@@ -93,8 +95,12 @@ export class ExportsService {
   private readonly athenaWorkGroup = process.env.AWS_ATHENA_WORKGROUP || 'primary';
   private readonly athenaOutputLocation =
     process.env.AWS_ATHENA_OUTPUT_LOCATION || `s3://${this.exportsBucket}/athena-results/`;
-  private readonly exportJobsTable = process.env.AWS_EXPORT_JOBS_TABLE || '';
-  private readonly exportMergeLambdaFunction = process.env.AWS_EXPORT_MERGE_LAMBDA_FUNCTION || '';
+  private readonly exportJobsTable =
+    process.env.AWS_EXPORT_JOBS_TABLE || process.env.EXPORT_JOBS_TABLE || 'ovis-export-jobs';
+  private readonly exportMergeLambdaFunction =
+    process.env.AWS_EXPORT_MERGE_LAMBDA_FUNCTION ||
+    process.env.EXPORT_MERGE_LAMBDA_FUNCTION ||
+    'ovis-export-merge';
   private readonly exportHistoryRetentionDays = Number.parseInt(
     process.env.AWS_EXPORT_HISTORY_RETENTION_DAYS || '30',
     10
@@ -236,12 +242,18 @@ export class ExportsService {
 
   private ensureJsonlPipelineConfigured() {
     if (!this.isPersistentStoreEnabled()) {
+      this.logger.error(
+        'Missing export jobs table configuration. Expected AWS_EXPORT_JOBS_TABLE or EXPORT_JOBS_TABLE.'
+      );
       throw new InternalServerErrorException(
         'Export jobs table is not configured. Set AWS_EXPORT_JOBS_TABLE before creating exports.'
       );
     }
 
     if (!this.exportMergeLambdaFunction) {
+      this.logger.error(
+        'Missing export merge Lambda configuration. Expected AWS_EXPORT_MERGE_LAMBDA_FUNCTION or EXPORT_MERGE_LAMBDA_FUNCTION.'
+      );
       throw new InternalServerErrorException(
         'Export merge lambda is not configured. Set AWS_EXPORT_MERGE_LAMBDA_FUNCTION before creating exports.'
       );

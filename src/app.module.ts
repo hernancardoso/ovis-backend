@@ -28,7 +28,7 @@ import { ExportBySheepModule } from './export-by-sheep/export-by-sheep.module';
     ConfigModule.forRoot({
       isGlobal: true,
       load: [databaseConfig, cognitoConfig],
-      envFilePath: ['.env.development.local'],
+      envFilePath: ['.env.development.local', '.env.local', '.env'],
     }),
     TypeOrmModule.forRootAsync({ useClass: TypeOrmConfigService }),
     CollarsModule,

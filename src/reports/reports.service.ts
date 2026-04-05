@@ -10,7 +10,7 @@ export class ReportsService {
 
   constructor() {
     const client = new DynamoDBClient({
-      region: 'us-east-1',
+      region: process.env.AWS_REGION || 'us-east-1',
       credentials: {
         accessKeyId: process.env.AWS_ACCESS_KEY ?? '',
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? '',
@@ -38,7 +38,7 @@ export class ReportsService {
       let lastEvaluatedKey: any = null;
 
       const params: any = {
-        TableName: 'report_acc_raw',
+        TableName: process.env.AWS_REPORTS_TABLE || 'report_acc_raw',
         KeyConditionExpression: 'imei = :collarImei AND #time BETWEEN :sdate AND :edate',
         ProjectionExpression: '#data, #time',
         ExpressionAttributeNames: { '#time': 'timestamp', '#data': 'data' },
