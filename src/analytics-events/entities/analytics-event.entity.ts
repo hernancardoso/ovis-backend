@@ -31,6 +31,6 @@ export class AnalyticsEvent {
   @Column({ type: 'json', nullable: true })
   metadata?: Record<string, any> | null;
 
-  @CreateDateColumn({ type: 'timestampt' })
+  @CreateDateColumn({ type: 'timestamp' })
   createdAt: Date;
 }
