@@ -28,9 +28,9 @@ export class AnalyticsEvent {
   @Column({ type: 'varchar', length: 50, nullable: true })
   severity?: string | null; // 'CRITICAL', 'WARNING', 'INFO'
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'json', nullable: true })
   metadata?: Record<string, any> | null;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'timestampt' })
   createdAt: Date;
 }
