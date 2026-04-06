@@ -55,4 +55,5 @@ export class CollarEntity extends TimestampedEntity {
   @Column({ type: 'varchar', length: 64, default: '1.0' })
   firmwareVersion: string;
 
+  status?: 'online' | 'stale' | 'offline';
 }

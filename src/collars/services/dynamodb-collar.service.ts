@@ -1,4 +1,3 @@
-// uses DynamoDBDocumentClient; PK-only table with imei as Number
 import { Injectable, Logger } from '@nestjs/common';
 import { DynamoDBClient, KeysAndAttributes } from '@aws-sdk/client-dynamodb';
 import {
@@ -9,6 +8,7 @@ import {
   QueryCommand,
 } from '@aws-sdk/lib-dynamodb';
 import { CollarEntity } from '../entities/collar.entity';
+import moment from 'moment';
 
 @Injectable()
 export class DynamoDBCollarService {
@@ -27,22 +27,19 @@ export class DynamoDBCollarService {
   private readonly collarInitialInfoTableName = 'collar_initial_info';
 
   private parseLatest(item: any) {
-    const parsedStatus = item.latest_status_json 
-      ? JSON.parse(item.latest_status_json) 
-      : null;
-    
-    const parsedLocation = item.latest_location_json
-      ? JSON.parse(item.latest_location_json)
-      : null;
+    const parsedStatus = item.latest_status_json ? JSON.parse(item.latest_status_json) : null;
+
+    const parsedLocation = item.latest_location_json ? JSON.parse(item.latest_location_json) : null;
 
     const location_timestamp = parsedLocation?.timestamp;
-    
+
     // Validate and build latestLocation
-    const hasValidLocation = parsedLocation 
-      && parsedLocation.lat != null 
-      && parsedLocation.long != null 
-      && location_timestamp != null;
-    
+    const hasValidLocation =
+      parsedLocation &&
+      parsedLocation.lat != null &&
+      parsedLocation.long != null &&
+      location_timestamp != null;
+
     const latestLocation = hasValidLocation
       ? {
           timestamp: location_timestamp,
@@ -54,7 +51,7 @@ export class DynamoDBCollarService {
     // Validate and build latestStatus
     const status_timestamp = parsedStatus?.timestamp;
     const hasValidStatus = parsedStatus && status_timestamp != null;
-    
+
     const latestStatus = hasValidStatus
       ? {
           timestamp: status_timestamp,
@@ -205,6 +202,24 @@ export class DynamoDBCollarService {
     return this.mapCollarsWithActivityData(collars, dynamoDataMap);
   }
 
+  private calculateStatus(latestStatus?: { timestamp: number }): 'online' | 'stale' | 'offline' {
+    if (!latestStatus?.timestamp) {
+      return 'offline';
+    }
+
+    const onlineThresholdHours = 1;
+    const staleThresholdHours = 24;
+    const hoursSinceLastStatus = moment().diff(moment(latestStatus.timestamp), 'hours', true);
+
+    if (hoursSinceLastStatus < onlineThresholdHours) {
+      return 'online';
+    } else if (hoursSinceLastStatus < staleThresholdHours) {
+      return 'stale';
+    }
+
+    return 'offline';
+  }
+
   /**
    * Maps collar(s) with DynamoDB activity data
    * Can handle either a single collar or an array of collars
@@ -218,30 +233,40 @@ export class DynamoDBCollarService {
     collars: CollarEntity[],
     dynamoDataMap: Map<number, { latestLocation?: any; latestStatus?: any }>
   ): CollarEntity[];
-  
+
   private mapCollarsWithActivityData(
     collarsOrCollar: CollarEntity | CollarEntity[],
-    dynamoDataOrMap?: { latestLocation?: any; latestStatus?: any } | null | Map<number, { latestLocation?: any; latestStatus?: any }>
+    dynamoDataOrMap?:
+      | { latestLocation?: any; latestStatus?: any }
+      | null
+      | Map<number, { latestLocation?: any; latestStatus?: any }>
   ): CollarEntity | CollarEntity[] {
     // Handle array case
     if (Array.isArray(collarsOrCollar)) {
       const collars = collarsOrCollar;
-      const dynamoDataMap = dynamoDataOrMap as Map<number, { latestLocation?: any; latestStatus?: any }>;
-      
+      const dynamoDataMap = dynamoDataOrMap as Map<
+        number,
+        { latestLocation?: any; latestStatus?: any }
+      >;
+
       return collars.map((collar) => {
         const dynamoData = dynamoDataMap.get(Number(collar.imei));
         return this.mapCollarsWithActivityData(collar, dynamoData) as CollarEntity;
       });
     }
-    
+
     // Handle single collar case
     const collar = collarsOrCollar;
-    const dynamoData = dynamoDataOrMap as { latestLocation?: any; latestStatus?: any } | null | undefined;
-    
+    const dynamoData = dynamoDataOrMap as
+      | { latestLocation?: any; latestStatus?: any }
+      | null
+      | undefined;
+
     return {
       ...collar,
       latestLocation: dynamoData?.latestLocation,
       latestStatus: dynamoData?.latestStatus,
+      status: this.calculateStatus(dynamoData?.latestStatus),
     } as CollarEntity;
   }
 }

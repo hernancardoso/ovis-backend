@@ -33,4 +33,7 @@ export class CollarDto {
 
   @Expose()
   firmwareVersion?: string;
+
+  @Expose()
+  status?: 'online' | 'stale' | 'offline';
 }
