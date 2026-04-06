@@ -21,4 +21,7 @@ export class PaddockEntity extends TimestampedEntity {
 
   @Column({ nullable: false })
   establishmentId: EstablishmentEntity['id'];
+
+  @Column({ type: 'simple-json', nullable: true, default: null })
+  boundaries: number[][] | null;
 }

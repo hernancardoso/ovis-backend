@@ -18,7 +18,10 @@ export class PaddocksService {
   ) {}
 
   async create(establishmentId: EstablishmentEntity['id'], createPaddockDto: CreatePaddockDto) {
-    const paddock = this.paddockRepository.create(createPaddockDto);
+    const paddock = this.paddockRepository.create({
+      name: createPaddockDto.name,
+      boundaries: createPaddockDto.boundaries ?? null,
+    });
     paddock.establishmentId = establishmentId;
 
     if (createPaddockDto.sheepIds && createPaddockDto.sheepIds.length > 0) {
@@ -36,10 +39,10 @@ export class PaddocksService {
   }
 
   async findAll(establishmentId: EstablishmentEntity['id']) {
-    return this.paddockRepository.find({ 
+    return this.paddockRepository.find({
       where: { establishmentId },
       relations: ['sheep'],
-      order: { createdAt: 'DESC' }
+      order: { createdAt: 'DESC' },
     });
   }
 
@@ -76,6 +79,10 @@ export class PaddocksService {
 
     if (paddock && updatePaddockDto.name) {
       paddock.name = updatePaddockDto.name;
+    }
+
+    if ('boundaries' in updatePaddockDto) {
+      paddock.boundaries = updatePaddockDto.boundaries ?? null;
     }
 
     if (updatePaddockDto.sheepIds !== undefined) {
