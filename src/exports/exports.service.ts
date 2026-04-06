@@ -597,21 +597,36 @@ export class ExportsService {
       }
     }
 
-    job.status = stateString;
-    job.athenaState = athenaState ? String(athenaState) : 'UNKNOWN';
-    job.s3Path = s3Path;
-    job.error = error;
-    job.statistics = {
-      dataScannedBytes,
-      executionTimeMs: queryExecution.Statistics?.TotalExecutionTimeInMillis,
-      engineExecutionTimeMs: queryExecution.Statistics?.EngineExecutionTimeInMillis,
-    };
-    job.updatedAt = this.nowIso();
-    if (stateString === 'SUCCEEDED') {
-      job.completedAt = job.completedAt || this.nowIso();
+    const athenaStateStr = athenaState ? String(athenaState) : 'UNKNOWN';
+
+    const hasStateChanges =
+      job.status !== stateString ||
+      job.athenaState !== athenaStateStr ||
+      job.s3Path !== s3Path ||
+      job.error !== error;
+
+    if (hasStateChanges) {
+      job.status = stateString;
+      job.athenaState = athenaStateStr;
+      job.s3Path = s3Path;
+      job.error = error;
+      job.statistics = {
+        dataScannedBytes,
+        executionTimeMs: queryExecution.Statistics?.TotalExecutionTimeInMillis,
+        engineExecutionTimeMs: queryExecution.Statistics?.EngineExecutionTimeInMillis,
+      };
+      job.updatedAt = this.nowIso();
+      if (stateString === 'SUCCEEDED') {
+        job.completedAt = job.completedAt || this.nowIso();
+      }
+
+      await this.saveJob(job);
+    } else {
+      // Just update the cache without writing to DynamoDB to prevent
+      // overwriting concurrent Lambda post-processing state updates
+      this.cacheJob(job);
     }
 
-    await this.saveJob(job);
     return job;
   }
 
